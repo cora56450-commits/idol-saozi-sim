@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>爱豆嫂子模拟器</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="viewport">
+  <div id="stage">
+
+    <!-- 标题 -->
+    <section id="scr-title" class="screen">
+      <div class="bg dim" style="background-image:url(assets/desk/desk.jpg)"></div>
+      <div class="title-block">
+        <img id="title-logo" src="assets/ui/title_logo.png" alt="" onerror="this.remove()">
+        <div class="title-text">
+          <div class="t-main">爱豆嫂子模拟器</div>
+          <div class="t-sub">아이돌 형수님 시뮬레이터</div>
+        </div>
+      </div>
+      <div class="title-menu">
+        <button class="btn-choice" data-act="new"><span>新游戏</span></button>
+        <button class="btn-choice" data-act="continue"><span>继续</span></button>
+        <button class="btn-choice" data-act="load"><span>读档</span></button>
+        <button class="btn-choice" data-act="settings"><span>设置</span></button>
+      </div>
+    </section>
+
+    <!-- 开局设定 -->
+    <section id="scr-setup" class="screen">
+      <div class="bg dim" style="background-image:url(assets/desk/desk.jpg)"></div>
+      <div class="panel setup-panel">
+        <div class="panel-inner">
+          <h2>开局</h2>
+          <label class="row"><span>你的名字（韩文）</span><input id="setup-name" maxlength="8" value="지은"></label>
+          <div class="row"><span>你的身份</span></div>
+          <div class="role-pick">
+            <button class="btn-choice role" data-role="civ"><span>圈外素人<small>弘大便当工作室老板，以前是他的粉丝</small></span></button>
+            <button class="btn-choice role" data-role="staff"><span>同公司员工<small>公司艺人营养师，能进练习室和后台</small></span></button>
+          </div>
+          <label class="row check"><input type="checkbox" id="setup-sub"> <span>订阅他的 BLINK 泡泡（之后可以在设置里改）</span></label>
+          <div class="row btns">
+            <button class="btn-small" data-act="back">返回</button>
+            <button class="btn-small primary" data-act="start">开始</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 桌面 -->
+    <section id="scr-desk" class="screen">
+      <div class="bg" id="desk-bg"></div>
+      <div class="desk-calendar">
+        <img src="assets/ui/calendar.png" alt="">
+        <div class="cal-text"><div class="cal-day" id="cal-day">第 1 天</div><div class="cal-date" id="cal-date"></div><div class="cal-phase" id="cal-phase"></div></div>
+      </div>
+      <div class="hotspot" data-hot="polaroid" style="left:1.5%;top:0%;width:23%;height:48%"></div>
+      <div class="hotspot" data-hot="album" style="left:76%;top:0%;width:24%;height:39%"></div>
+      <div class="hotspot" data-hot="note" style="left:84%;top:40%;width:15%;height:18%"></div>
+      <div class="hotspot" data-hot="phone" style="left:86%;top:66%;width:13.5%;height:34%"></div>
+      <div class="hotspot" data-hot="bento" style="left:0%;top:63%;width:25%;height:30%"></div>
+      <div id="hot-label"></div>
+      <div id="desk-badge" class="phone-badge hidden"></div>
+    </section>
+
+    <!-- 线下场景 -->
+    <section id="scr-scene" class="screen">
+      <div class="bg" id="scene-bg"></div>
+      <div id="scene-cg"></div>
+      <img id="scene-sprite" alt="">
+      <div id="scene-section"></div>
+      <div id="dialog" class="dialog">
+        <div id="dlg-name" class="name-plate"><span></span></div>
+        <div class="dlg-body"><div id="dlg-text"></div></div>
+        <div class="dlg-next">▼</div>
+      </div>
+      <div id="choices" class="choices"></div>
+    </section>
+
+    <!-- 手机 -->
+    <section id="phone" class="hidden">
+      <div class="phone-dim"></div>
+      <div class="phone-wrap">
+        <div class="phone-screen" id="phone-screen"></div>
+        <img class="phone-frame" src="assets/ui/phone_frame.png" alt="">
+      </div>
+      <button class="phone-close" id="phone-close" title="放下手机"><img src="assets/ui/btn_phone.png" alt=""></button>
+    </section>
+
+    <!-- 横幅、弹窗 -->
+    <div id="notify" class="notify hidden"><img class="nb-bg" src="assets/ui/notify_banner.png" alt=""><img class="nb-icon" alt=""><div class="nb-text"><b></b><span></span></div></div>
+    <div id="alert" class="alert hidden"><div class="alert-text"></div></div>
+    <div id="transition" class="transition hidden"><div class="torn"><span></span></div></div>
+    <div id="modal" class="hidden"><div class="modal-dim"></div><div class="panel modal-panel"><button class="modal-close">关闭</button><div class="panel-inner" id="modal-inner"></div></div></div>
+    <div id="cg-view" class="hidden"><div class="cg-img"></div><div class="cg-tip">点击继续</div></div>
+    <div id="debug" class="hidden"></div>
+    <div id="loading" class="hidden"><span>…</span></div>
+  </div>
+</div>
+
+<script src="data/config.js"></script>
+<script src="data/events.js"></script>
+<script src="js/prompts.js"></script>
+<script src="js/state.js"></script>
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/story.js"></script>
+<script src="js/phone.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
