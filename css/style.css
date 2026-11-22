@@ -322,3 +322,11 @@ input, textarea { font-family: inherit; }
 .cg-thumb span { width: 100%; padding: 4px 6px; background: rgba(12,12,12,.7); color: #fff; font-size: 12px; text-align: center; }
 .cg-thumb.locked { cursor: default; display: flex; align-items: center; }
 .cg-thumb.locked span { background: none; color: #8a8784; font-size: 22px; }
+
+/* 新手提示 */
+#tip { position: absolute; inset: 0; z-index: 80; background: rgba(10,10,10,.35); }
+.tip-panel { left: 450px; top: 230px; width: 700px; height: 440px; }
+.tip-panel .panel-inner { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 40px 10px; }
+#tip-title { margin-bottom: 14px; }
+#tip-text { font-size: 19px; line-height: 1.8; text-align: center; white-space: pre-line; }
+.tip-btn { margin-top: 22px; }

@@ -99,6 +99,18 @@ window.CONFIG = {
     { ev: 'day84', choice: 1, img: 'ev_day84_1', name: '第 84 天 · 圣诞' }
   ],
 
+  // 音乐（assets/bgm/）：theme 主题/日常，date 约会/开心，sweet 线下甜蜜，tense 曝光/紧张，sad 悲伤/追忆
+  BGM_EVENT: {
+    day1: 'theme', day3: 'sweet', day7: 'date', day12: 'date', day16: 'date', day20: 'date', day22: 'tense',
+    day25: 'sweet', day30: 'tense', day33: 'tense', day35: 'sweet', day40: 'sad', day48: 'theme', day52: 'date',
+    day57: 'tense', day60: 'tense', day62: 'date', day66: 'tense', day72: 'tense', day78: 'sweet', day84: 'date', day90: 'tense',
+    'end:Love wins all': 'sweet', 'end:If You': 'sad', 'end:밤편지': 'sweet', 'end:L.I.E': 'sad', 'end:사랑과 전쟁': 'sad', 'end:사랑이 잘': 'sad',
+    'after:Love wins all': 'date', 'after:If You': 'sad', 'after:밤편지': 'sweet', 'after:L.I.E': 'sad', 'after:사랑과 전쟁': 'sweet', 'after:사랑이 잘': 'sad',
+    intro: 'theme'
+  },
+  // 事件开始时的音效
+  SFX_EVENT: { day72: 'shutter', 'end:If You': 'shutter', 'end:L.I.E': 'shutter' },
+
   // 他私聊能发的表情包（API 用 id）
   STICKERS: {
     hungry: { img: 'assets/ui/st_hungry.png', ko: '배고파' },

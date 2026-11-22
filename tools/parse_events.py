@@ -27,6 +27,10 @@ def parse_fx(t):
     return fx, flags
 
 def header_cond(h):
+    if '没订阅泡泡' in h: return '!sub'
+    if '订阅了泡泡' in h: return 'sub'
+    if '元旦结算时' in h: return 'day>=90'
+    if '中途曝光时' in h: return 'day<90'
     if '员工线' in h: return "role=='staff'"
     if '素人线' in h: return "role=='civ'"
     if '感情值 30 以上' in h: return 'aff>=30'

@@ -30,8 +30,10 @@
     const r = await fetch(s.baseUrl.replace(/\/$/, '') + '/chat/completions', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + s.apiKey },
-      body: JSON.stringify({ model: s.model, temperature: +s.temperature, max_tokens: maxTokens || 2000,
-        messages: [{ role: 'system', content: system }, { role: 'user', content: user }] })
+      body: JSON.stringify(Object.assign({ model: s.model, temperature: +s.temperature, max_tokens: maxTokens || 2000,
+        messages: [{ role: 'system', content: system }, { role: 'user', content: user }] },
+        // DeepSeek 默认开思考模式，会慢很多，还会吃掉 max_tokens；游戏里关掉
+        /deepseek/i.test(s.baseUrl) ? { thinking: { type: 'disabled' } } : {}))
     });
     if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + (await r.text()).slice(0, 200));
     const j = await r.json();

@@ -60,6 +60,7 @@
       if (view === 'blink') S.unread.blink = 0;
       if (view === 'pan') S.unread.pan = 0;
       if (view === 'insta') S.unread.insta = 0;
+      UI.tip({ home: 'home', chat: 'chat', blink: 'blink', pan: 'pan', insta: 'insta' }[view]);
     },
 
     unreadTotal() {
@@ -157,6 +158,7 @@
           else if (r.type === 'voice') { m.type = 'voice'; m.ko = r.ko; m.zh = r.zh; m.note = r.note; }
           else { m.ko = r.ko; m.zh = r.zh; m.note = r.note; }
           S.chats[id].push(m);
+          Sound.sfx('msg');
           if (this.view === 'chat' && this.arg === id) this.go('chat', id); else S.unread[id] = (S.unread[id] || 0) + 1;
         }
         UI.tick(2);

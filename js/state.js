@@ -52,7 +52,7 @@
       a = +a || 0; e = +e || 0; m = +m || 0;
       if (source === 'chat') m = Math.max(-3, Math.min(3, m));
       if (source === 'chat') {
-        const capA = 8, capE = 6;
+        const capA = 4, capE = 3; // 每天聊天带来的变化上限
         a = clamp(a, -capA - S.dayDelta.aff, capA - S.dayDelta.aff);
         e = clamp(e, -capE - S.dayDelta.exp, capE - S.dayDelta.exp);
         S.dayDelta.aff += a; S.dayDelta.exp += e;
@@ -90,7 +90,7 @@
       if (!cond) return true;
       const S = this.S;
       const env = { role: S.role, aff: S.aff, exp: S.exp, amb: S.amb, knot1: S.flags.knot1, knot2: S.flags.knot2,
-        cheat: S.flags.cheat, lastChoice: S.lastChoice, outcome: S.outcome };
+        cheat: S.flags.cheat, lastChoice: S.lastChoice, outcome: S.outcome, sub: !!S.sub, day: S.day };
       try { return !!Function(...Object.keys(env), 'return (' + cond + ');')(...Object.values(env)); }
       catch (e) { console.warn('条件出错', cond, e); return true; }
     },
@@ -102,7 +102,7 @@
       list.push('dongmin');
       if (S.role === 'civ') list.push('friend'); else { list.push('work'); list.push('eunji'); }
       if (!S.chats.brother) S.chats.brother = [];
-      list.push('brother');
+      if (S.day >= 20 || S.seen.day20) list.push('brother');
       if (S.amb > 0) list.push('siwon');
       return list;
     },

@@ -52,16 +52,16 @@ tools/              转换脚本
 
 ## 改文案 / 改提示词以后
 
-改了上一层的「固定文案.md」：
+改了「文档/固定文案.md」：
 
 ```
-python3 tools/parse_events.py ../固定文案.md data/events.js
+python3 tools/parse_events.py ../文档/固定文案.md data/events.js
 ```
 
-改了「API提示词.md」：
+改了「文档/API提示词.md」：
 
 ```
-python3 tools/build_prompts.py ../API提示词.md js/prompts.js
+python3 tools/build_prompts.py ../文档/API提示词.md js/prompts.js
 ```
 
 ## 放美术素材

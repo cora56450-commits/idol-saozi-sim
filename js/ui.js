@@ -35,6 +35,7 @@
       $('#cal-phase').textContent = SCHEDULE.phaseOf(S.day);
       this.updateBadge();
       this.show('scr-desk');
+      if (!Story.ev) { Sound.deskBgm(); this.tip('desk'); }
     },
     updateBadge() {
       const n = Phone.unreadTotal();
@@ -56,6 +57,7 @@
       n.querySelector('b').textContent = title;
       n.querySelector('span').textContent = text;
       n.classList.remove('hidden');
+      Sound.sfx(app === 'blink' ? 'bubble' : 'msg');
       n.onclick = () => { n.classList.add('hidden'); onClick && onClick(); };
       clearTimeout(this._nt);
       this._nt = setTimeout(() => n.classList.add('hidden'), 4200);
@@ -66,6 +68,7 @@
       const a = $('#alert');
       a.querySelector('.alert-text').textContent = text;
       a.classList.remove('hidden');
+      Sound.sfx('alert');
       clearTimeout(this._at);
       this._at = setTimeout(() => a.classList.add('hidden'), 4500);
       a.onclick = () => a.classList.add('hidden');
@@ -77,6 +80,7 @@
         const t = $('#transition');
         t.querySelector('span').innerHTML = esc(title) + (sub ? `<small>${esc(sub)}</small>` : '');
         t.classList.remove('hidden');
+        Sound.sfx('tear');
         const done = () => { t.classList.add('hidden'); t.onclick = null; res(); };
         t.onclick = done;
         setTimeout(done, ms || 1800);
@@ -112,24 +116,28 @@
           <option value="openai">OpenAI 兼容（OpenAI / DeepSeek / 中转站）</option>
           <option value="anthropic">Anthropic（Claude）</option></select></div>
         <div class="row"><span>接口地址</span><input type="text" id="st-base" value="${esc(s.baseUrl)}"></div>
-        <div class="hint">OpenAI 兼容填到 /v1 为止，例如 https://api.deepseek.com/v1 。Anthropic 可以留空。</div>
+        <div class="hint">DeepSeek：接口类型选 OpenAI 兼容，地址填 https://api.deepseek.com/v1 ，模型填 deepseek-flash。Anthropic 地址可以留空。</div>
         <div class="row"><span>API Key</span><input type="password" id="st-key" value="${esc(s.apiKey)}"></div>
         <div class="row"><span>模型</span><input type="text" id="st-model" value="${esc(s.model)}"></div>
         <div class="row"><span>温度</span><input type="range" id="st-temp" min="0" max="1.3" step="0.05" value="${s.temperature}"><b id="st-temp-v">${s.temperature}</b></div>
         <div class="row"><span>音乐音量</span><input type="range" id="st-bgm" min="0" max="1" step="0.05" value="${s.bgm}"></div>
+        <div class="row"><span>音效音量</span><input type="range" id="st-sfx" min="0" max="1" step="0.05" value="${s.sfx}"></div>
         ${inGame ? `<div class="row"><span>泡泡订阅</span><label><input type="checkbox" id="st-sub" ${Game.S.sub ? 'checked' : ''}> 订阅他的 BLINK</label></div>` : ''}
-        <div class="btns"><button class="btn-small" id="st-test">测试连接</button><button class="btn-small primary" id="st-save">保存</button></div>
+        <div class="btns"><button class="btn-small" id="st-tips">重新显示新手提示</button><button class="btn-small" id="st-test">测试连接</button><button class="btn-small primary" id="st-save">保存</button></div>
         <div class="hint" id="st-msg" style="margin-left:0;text-align:center"></div>
       </div>`, (root) => {
         $('#st-provider', root).value = s.provider;
         $('#st-temp', root).oninput = (e) => { $('#st-temp-v').textContent = e.target.value; };
+        $('#st-bgm', root).oninput = (e) => { Game.saveSettings(Object.assign(Game.settings(), { bgm: +e.target.value })); Sound.setVolume(); };
+        $('#st-sfx', root).oninput = (e) => { Game.saveSettings(Object.assign(Game.settings(), { sfx: +e.target.value })); Sound.sfx('msg'); };
         const read = () => ({ provider: $('#st-provider').value, baseUrl: $('#st-base').value.trim(), apiKey: $('#st-key').value.trim(),
-          model: $('#st-model').value.trim(), temperature: +$('#st-temp').value, bgm: +$('#st-bgm').value });
+          model: $('#st-model').value.trim(), temperature: +$('#st-temp').value, bgm: +$('#st-bgm').value, sfx: +$('#st-sfx').value });
         $('#st-save', root).onclick = () => {
           Game.saveSettings(Object.assign(Game.settings(), read()));
           if (inGame) { Game.S.sub = $('#st-sub').checked; }
           $('#st-msg').textContent = '已保存';
         };
+        $('#st-tips', root).onclick = () => { this.resetTips(); $('#st-msg').textContent = '新手提示已重置'; };
         $('#st-test', root).onclick = async () => {
           Game.saveSettings(Object.assign(Game.settings(), read()));
           $('#st-msg').textContent = '连接中…';
@@ -206,6 +214,20 @@
         });
       });
     },
+
+    // ---- 新手提示（每个只弹一次）----
+    tip(key) {
+      const g = Game.global(); g.tips = g.tips || {};
+      if (g.tips[key] || !TIPS[key]) return Promise.resolve();
+      g.tips[key] = 1; localStorage.setItem('idolsao_global', JSON.stringify(g));
+      return new Promise(res => {
+        $('#tip-title').textContent = TIPS[key][0];
+        $('#tip-text').textContent = TIPS[key][1];
+        $('#tip').classList.remove('hidden');
+        $('#tip-ok').onclick = () => { $('#tip').classList.add('hidden'); res(); };
+      });
+    },
+    resetTips() { const g = Game.global(); g.tips = {}; localStorage.setItem('idolsao_global', JSON.stringify(g)); },
 
     // ---- 调试（Shift + D）----
     debugToggle() { $('#debug').classList.toggle('hidden'); this.debugRefresh(); },

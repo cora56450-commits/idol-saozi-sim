@@ -12,6 +12,8 @@
       this.ev = ev; this.log = []; this._cgShown = {}; this.cgOn = false;
       document.querySelector('#alert').classList.add('hidden');
       this.mode = ev.mode;
+      Sound.bgm(CONFIG.BGM_EVENT[id] || (ev.mode === 'gal' ? 'sweet' : 'theme'));
+      if (CONFIG.SFX_EVENT[id]) Sound.sfx(CONFIG.SFX_EVENT[id]);
       const S = Game.S;
       if (ev.kind === 'event') await UI.transition(ev.day === 1 ? '序章' : `第 ${ev.day} 天`, ev.title.replace(/（.*?）$/, ''));
       if (this.mode === 'gal') {
@@ -23,9 +25,11 @@
         UI.show('scr-scene');
       } else {
         UI.renderDesk();
+        Sound.sfx('vibrate');
         Phone.openStory(ev.kind === 'event' ? ev.title.replace(/（.*?）$/, '') : ev.title);
       }
       if (ev.kind === 'ending' && CONFIG.ENDING_CG[ev.id.slice(4)]) this.setCG(CONFIG.ENDING_CG[ev.id.slice(4)], true);
+      await UI.tip(this.mode === 'gal' ? 'gal' : 'phoneStory');
       await this.run(ev.blocks);
       if (this.mode === 'phone') Phone.closeStory();
       if (ev.kind === 'event') S.seen[ev.id] = true;
@@ -165,7 +169,7 @@
       if (b.outcome) {
         idx = Math.max(0, opts.findIndex(o => o.label === S.outcome));
       } else {
-        const r = await this.askChoice(opts);
+        const r = await this.askChoice(opts, true);
         if (r.free) { await this.freeOption(opts, r.text); return; }
         idx = r.index;
       }
@@ -184,6 +188,7 @@
     },
 
     askChoice(opts) {
+      UI.tip('choice');
       return new Promise(res => {
         const done = (r) => { box.innerHTML = ''; box.classList.add('hidden'); res(r); };
         let box;

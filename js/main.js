@@ -17,6 +17,7 @@
     toTitle() {
       Phone.close(); $('#phone').classList.add('hidden');
       Game.S = null;
+      Sound.bgm('theme');
       $('[data-act=continue]').style.display = Game.peek('auto') && !Game.peek('auto').ending ? '' : 'none';
       UI.show('scr-title');
     },
@@ -41,8 +42,10 @@
       $('#scr-setup [data-act=back]').onclick = () => UI.show('scr-title');
       $('#scr-setup [data-act=start]').onclick = () => {
         Game.newGame({ role: this.setupRole, name: $('#setup-name').value.trim() || '지은', sub: $('#setup-sub').checked });
-        if (!Game.settings().apiKey) UI.notify('toktok', '提示', '还没设置 API：聊天、论坛、泡泡会用离线样例。桌上的专辑 → 设置');
-        this.startDay();
+        this.playIntro().then(() => {
+          if (!Game.settings().apiKey) UI.notify('toktok', '提示', '还没设置 API：聊天、论坛、泡泡会用离线样例。桌上的专辑 → 设置');
+          this.startDay();
+        });
       };
     },
 
@@ -68,6 +71,14 @@
       if (k === 'note') UI.planModal();
       if (k === 'polaroid') UI.galleryModal();
       if (k === 'bento') this.endDay();
+    },
+
+    // ---------- 开场介绍 ----------
+    async playIntro() {
+      const S = Game.S, I = INTRO;
+      const lines = [...I.before, ...I[S.role], ...I.after].map(s => ({ t: 'nar', text: s.replace(/\{name\}/g, S.name) }));
+      EVENTS.intro = { id: 'intro', day: 1, title: '', mode: 'gal', kind: 'intro', blocks: lines };
+      await Story.play('intro');
     },
 
     // ---------- 一天 ----------
@@ -114,7 +125,7 @@
       S.unread.blink = S.sub ? (f.bubble || []).length : 0;
       S.unread.pan = (f.forum || []).length;
       S.unread.insta = (f.instasnap || []).length;
-      if (!f.offline) Game.applyFx({ exp: Math.max(-5, Math.min(5, f.exposure_hint || 0)) }, 'event');
+      if (!f.offline) Game.applyFx({ exp: Math.max(-2, Math.min(2, f.exposure_hint || 0)) }, 'event'); // 每日动态对曝光的影响压在 ±2
       if (!f.offline) (f.alerts || []).forEach(a => Game.remember(a));
       if (f.alerts && f.alerts.length && !f.offline && !Story.ev) UI.alert(f.alerts[0]);
       else if (S.sub && f.bubble && f.bubble[0]) UI.notify('blink', 'BLINK · 徐允在', f.bubble[0].messages[0].ko, () => Phone.open('blink'));
@@ -150,6 +161,7 @@
       if (tier !== S._lastTier) {
         if (S._lastTier && (tier === '危险' || tier === '临界')) UI.alert(tier === '临界' ? '论坛首页一半都在说他。有人在等元旦的新闻。' : '关于他恋爱的帖子越来越多了。');
         S._lastTier = tier;
+        if (!Story.ev && document.querySelector('#scr-desk.on')) Sound.deskBgm();
       }
       return false;
     },
