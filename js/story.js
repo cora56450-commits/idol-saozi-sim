@@ -127,6 +127,8 @@
 
     bgFor(key) {
       let b = CONFIG.SCENE_BG[key];
+      // 被扒的结局大多是中途触发的（不是元旦）：那天早上被手机震醒，用自己的桌面做背景
+      if (key === 'end:If You' && Game.S.day < 90) b = null;
       if (b && typeof b === 'object') b = b[Game.S.role];
       return b ? `assets/bg/${b}.jpg` : `assets/desk/${Game.S.role === 'staff' ? 'desk_staff' : 'desk'}.jpg`;
     },

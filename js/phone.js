@@ -56,7 +56,9 @@
     p._img = best || '';
     return p._img;
   }
-  const speakerKey = { '弟弟': 'brother', '他': 'he', '徐允在': 'he', '东旻': 'dongmin', '韩东旻': 'dongmin', '柳时元': 'siwon', '郑书娟': 'friend', '宋恩智': 'eunji' };
+  const speakerKey = { '弟弟': 'brother', '他': 'he', '徐允在': 'he', '东旻': 'dongmin', '韩东旻': 'dongmin', '柳时元': 'siwon', '郑书娟': 'friend', '宋恩智': 'eunji',
+    '白秀珍': 'sujin', '秀珍': 'sujin', '吴叡琳': 'yerin', '叡琳': 'yerin' };
+  const GROUP_CHATS = ['group', 'work', 'shop'];
   const statusBar = (light) => `<div class="status-bar ${light ? 'light' : ''}"><span>${UI.clock()}</span><span>LTE ▮▮▮ 82%</span></div>`;
   const head = (title, sub, back) => `<div class="app-head"><button class="back" data-back="${back || 'home'}"><img src="assets/ui/ic_back.png" alt=""></button><div class="title">${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</div></div>`;
 
@@ -160,8 +162,9 @@
       }
       if (me) return `<div class="msg me">${m.unread ? '<span class="read1">1</span>' : ''}<div class="col">${inner}</div></div>`;
       const who = m.speaker || Game.CHATS[chatId].who;
-      const key = speakerKey[who] || chatId;
-      const showName = chatId === 'group' || chatId === 'work';
+      // 群里每个人用自己的头像；没有头像的人显示名字首字，不用群头像（不然一排全是同一个群头像）
+      const key = speakerKey[who] || (GROUP_CHATS.includes(chatId) ? 'none' : chatId);
+      const showName = GROUP_CHATS.includes(chatId);
       return `<div class="msg">${avatarHTML(key, N(who))}<div class="col">${showName ? `<div class="who">${esc(N(who))}</div>` : ''}${inner}</div></div>`;
     },
 

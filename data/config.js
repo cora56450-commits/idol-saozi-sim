@@ -79,7 +79,8 @@ window.CONFIG = {
     he: 'assets/avatar/yunjae.png', dongmin: 'assets/avatar/dongmin.png', siwon: 'assets/avatar/siwon.png',
     friend: 'assets/avatar/seoyeon.png', eunji: 'assets/avatar/eunji.png', group: 'assets/avatar/group.png',
     work: 'assets/avatar/work.png', brother: 'assets/avatar/brother.png', moon: 'assets/avatar/moon.png',
-    shop: 'assets/avatar/shop.png', official: 'assets/avatar/official.png', junho: 'assets/avatar/junho.png'
+    shop: 'assets/avatar/shop.png', official: 'assets/avatar/official.png', junho: 'assets/avatar/junho.png',
+    sujin: 'assets/avatar/sujin.png', yerin: 'assets/avatar/yerin.png'
   },
   // InstaSnap 上的账号头像：按账号名 / 昵称匹配到上面的头像
   INSTA_AVATAR: [['윤재|允在|yoonjae|yunjae', 'he'], ['동민|东旻|dongmin', 'dongmin'], ['시원|时元|siwon', 'siwon'],

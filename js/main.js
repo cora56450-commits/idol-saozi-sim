@@ -435,7 +435,7 @@
       if (S.exp >= 100) { this.ending('If You'); return true; }
       const tier = Game.expTier();
       if (tier !== S._lastTier) {
-        if (S._lastTier && (tier === '危险' || tier === '临界')) UI.alert(tier === '临界' ? '论坛首页一半都在说他。有人在等元旦的新闻。' : '关于他恋爱的帖子越来越多了。');
+        if (S._lastTier && (tier === '危险' || tier === '临界')) UI.alert(tier === '临界' ? '论坛首页一半都在说他。有人说，照片已经在记者手里了。' : '关于他恋爱的帖子越来越多了。');
         S._lastTier = tier;
         if (!Story.ev && document.querySelector('#scr-desk.on')) Sound.deskBgm();
       }
