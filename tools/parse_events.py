@@ -39,8 +39,9 @@ def header_cond(h):
     if '中途曝光时' in h: return 'day<90'
     if '员工线' in h: return "role=='staff'"
     if '素人线' in h: return "role=='civ'"
-    if '感情值 30 以上' in h: return 'aff>=30'
-    if '感情值低于 30' in h: return 'aff<30'
+    # 第 72 天：和「劈腿线」判定用同一个标记，阈值改了也不会对不上
+    if re.search(r'感情值\s*\d+\s*以上', h): return '!cheat'
+    if re.search(r'感情值低于\s*\d+', h): return 'cheat'
     if '心结未解开' in h: return '!knot1'
     if '心结已解开' in h: return 'knot1'
     m = re.search(r'选\s*(\d)\s*或\s*(\d)', h)
@@ -281,17 +282,19 @@ def clean(bs):
                 o.pop('_cond', None); clean(o['after'])
 for e in events.values(): clean(e['blocks'])
 # 线下事件里：旁白说到「手机亮了 / 发来」之后的台词是手机消息（不显示立绘），说到「推门进来 / 站在面前」之后又回到面对面
+STRONG_ON = re.compile(r'手机(亮|震|响)|他(又)?发来|发了一(条|张|段)|又来一条|来消息|私聊亮|群里亮|弹出一条')
 PHONE_ON = re.compile(r'手机(亮|震|响)|发来|发了一|来了一条|又来一条|来消息|消息|已读|回了一|私聊|打字|语音|视频通话|电话')
 PHONE_OFF = re.compile(r'回信|写信|信纸|信封|猫眼|门外|敲门|门口|楼梯|他说[：:]|推开|推门|走进|进来|进门|开门|站在|坐在|面前|身边|身后|旁边|对面|抬头|车里|车上|走过来|走廊|后台|见到|看到他|他来了|拉住|握住|抱住')
 def mark_phone(bs, on):
     for b in bs:
         if b['t'] == 'nar':
             tx = b.get('text', '')
-            if PHONE_OFF.search(tx) and not re.search(r'手机|消息', tx): on = False
+            if STRONG_ON.search(tx): on = True          # 「他发来一张后台的照片」：明确是手机，优先
+            elif PHONE_OFF.search(tx) and not re.search(r'手机|消息', tx): on = False
             elif PHONE_ON.search(tx): on = True
         elif b['t'] == 'section':
             on = False
-        elif b['t'] == 'say' and on and not b.get('ch') and b.get('who') not in ('论坛', '泡泡', '粉丝在下面刷', '标题'):
+        elif b['t'] == 'say' and on and not b.get('ch') and b.get('who') not in ('论坛', '泡泡', '粉丝在下面刷', '标题', '粉丝', '粉丝群', '群主'):
             b['ch'] = 'chat'
         elif b['t'] == 'me' and on and not b.get('ch'):
             b['ch'] = 'chat'
@@ -303,12 +306,19 @@ for e in events.values():
 
 # 「下一条隔了很久才来：고마워 누나（谢谢姐姐）」这类旁白里夹着他的一条消息 → 拆成旁白 + 他的消息
 INLINE = re.compile(r'^(.{0,40}?(?:他(?:又)?(?:发|回)(?:来|了)?(?:一条|一句|最后一条)?|下一条[^：:]*))[：:]\s*([^（）]*[가-힣][^（）]*)（([^（）]+)）[。.]?$')
+INLINE2 = re.compile(r'^(?P<pre>.{0,40}?(?P<who>东旻|柳时元|郑书娟|宋恩智|弟弟)(?:在[^：:]{1,8}里|又?发来(?:一条|一句)?))[：:]\s*(?P<ko>[^（）]*[가-힣][^（）]*)（(?P<zh>[^（）]+)）[。.]?$')
 def split_inline(bs):
     out = []
     for b in bs:
         if b['t'] == 'choice':
             for o in b['options']: o['after'] = split_inline(o.get('after', []))
         m = INLINE.match(b.get('text', '')) if b['t'] == 'nar' else None
+        m2 = INLINE2.match(b.get('text', '')) if b['t'] == 'nar' and not m else None
+        if m2:  # 「东旻在三人群里：형 그거……（哥……）」
+            n = {'t': 'nar', 'text': m2.group('pre') + '：'}
+            s = {'t': 'say', 'who': m2.group('who'), 'ko': m2.group('ko').strip(), 'zh': m2.group('zh').strip(), 'ch': 'chat'}
+            if b.get('if'): n['if'] = s['if'] = b['if']
+            out += [n, s]; continue
         if m:
             n = {'t': 'nar', 'text': m.group(1) + '：'}
             s = {'t': 'say', 'who': '他', 'ko': m.group(2).strip(), 'zh': m.group(3).strip(), 'ch': 'chat'}

@@ -356,3 +356,12 @@ input, textarea { font-family: inherit; }
 /* 手机框右下角有一颗星星装饰，底部输入栏往左让开 */
 .app-foot { padding-right: 36px; }
 .story-choices .free { padding-right: 26px; }
+
+/* 桌面新手引导：挖一个洞高亮当前的东西，旁边一张说明卡 */
+.tour { position: absolute; inset: 0; z-index: 80; }
+.tour-hole { position: absolute; border-radius: 14px; box-shadow: 0 0 0 4000px rgba(10, 8, 8, .62); outline: 3px solid #fff; transition: all .25s ease; pointer-events: none; }
+.tour-box { position: absolute; width: 420px; background: #fbf8f4; border: 1px solid #161616; padding: 22px 26px 18px; box-shadow: 0 10px 30px rgba(0,0,0,.35); transition: left .25s ease, top .25s ease; }
+.tour-box b { display: block; font-size: 26px; margin-bottom: 8px; color: #8e1b2a; }
+.tour-box p { font-size: 19px; line-height: 1.6; margin: 0 0 16px; color: #222; }
+.tour-foot { display: flex; justify-content: space-between; align-items: center; }
+.tour-n { font-size: 15px; color: #8a847e; }

@@ -130,13 +130,23 @@ ${extra || ''}`;
       return callJSON(sys, user, 1000);
     },
 
-    async feed() {
+    // 分两步：part 'A' = 泡泡 + InstaSnap + 曝光提示（先出来给玩家看）；part 'B' = 论坛 + 粉丝群（围绕 A 的内容讨论，在后台生成）
+    async feed(part, a) {
       const S = Game.S;
       const prev = [S.day - 1, S.day - 2].map(d => S.feeds[d]).filter(Boolean).map((f, i) =>
         `前${i + 1}天论坛标题：${(f.forum || []).map(p => p.title_zh).join(' / ')}；泡泡摘要：${(f.bubble || []).flatMap(b => b.messages).slice(0, 4).map(m => m.zh).join(' / ')}`).join('\n');
       const sys = common() + '\n\n' + PROMPTS.feed.replace(/\{day\}/g, S.day) +
         `\n\n输出格式：\n${PROMPTS.feedFormat}\n\n${examples(PROMPTS.feedEx)}`;
-      const user = stateBlock(prev ? '【前两天的内容（别重复，话题可以接着发酵）】\n' + prev : '');
+      let user = stateBlock(prev ? '【前两天的内容（别重复，话题可以接着发酵）】\n' + prev : '');
+      if (part === 'A') {
+        user += '\n\n【这次只写四个字段】bubble、instasnap、exposure_hint、alerts；forum 和 fan_group 输出空数组（下一步再写）。';
+        return callJSON(sys, user, 3000);
+      }
+      if (part === 'B') {
+        const done = `泡泡：${(a.bubble || []).flatMap(b => b.messages.map(m => `${b.time} ${m.zh || m.note || ''}`)).join(' / ')}\nInstaSnap：${(a.instasnap || []).map(x => `${x.display_name || x.account}：${x.note || ''}｜${x.caption_zh || ''}`).join(' / ')}`;
+        user += `\n\n【今天的泡泡和 InstaSnap 已经发出去了，内容如下】\n${done}\n\n【这次只写 forum 和 fan_group 两个字段】论坛和粉丝群围绕上面这些内容讨论（时间要在对应泡泡 / 动态之后）；bubble、instasnap 输出空数组，exposure_hint 写 0，alerts 写空数组。`;
+        return callJSON(sys, user, 4000);
+      }
       return callJSON(sys, user, 6000);
     },
 

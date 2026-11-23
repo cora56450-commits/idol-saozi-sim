@@ -269,12 +269,14 @@
     },
     panList() {
       const posts = this.allPosts();
+      const today = Game.S.feeds[Game.S.day];
+      const pending = today && today._pendingB ? '<div class="day-sep">今天的帖子还在刷新…</div>' : '';
       const items = posts.map(({ d, i, p }) => `<div class="post" data-post="${d}:${i}">
         <div class="pt">${p.hot ? '<img src="assets/ui/ic_hot.png" alt="HOT">' : ''}<span>${esc(p.title_ko)}</span></div>
         <div class="pz">${esc(p.title_zh)}</div>
         <div class="pm">${(p.comments || []).length} 评论 · ${(p.views || 0).toLocaleString()} 浏览 · ${esc(Game.dateStr(d).slice(5, 10))}</div></div>`).join('');
       return `<div class="app pan">${statusBar()}${head('더쿠판', 'THEQOOPAN')}<div class="pan-tabs"><div class="on">스퀘어</div><div>핫게</div><div>루미에르</div></div>
-        <div class="app-body pan-list">${items || '<div class="empty-tip">还没有帖子</div>'}</div></div>`;
+        <div class="app-body pan-list">${pending}${items || (pending ? '' : '<div class="empty-tip">还没有帖子</div>')}</div></div>`;
     },
     panPost(key) {
       const [d, i] = key.split(':').map(Number);

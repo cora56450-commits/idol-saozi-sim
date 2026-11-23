@@ -52,8 +52,8 @@
       a = +a || 0; e = +e || 0; m = +m || 0;
       if (source === 'chat') m = Math.max(-3, Math.min(3, m));
       if (source === 'chat') {
-        const capA = 4, capE = 3; // 每天聊天带来的变化上限
-        a = clamp(a, -capA - S.dayDelta.aff, capA - S.dayDelta.aff);
+        const B = CONFIG.BALANCE, capE = B.chatExpCap; // 每天聊天带来的变化上限
+        a = clamp(a, -B.chatAffFloor - S.dayDelta.aff, B.chatAffCap - S.dayDelta.aff);
         e = clamp(e, -capE - S.dayDelta.exp, capE - S.dayDelta.exp);
         S.dayDelta.aff += a; S.dayDelta.exp += e;
       }
@@ -64,7 +64,7 @@
     },
     setFlag(f) { this.S.flags[f] = true; },
 
-    affTier() { const a = this.S.aff; return a >= 75 ? '高' : a >= 40 ? '中' : '低'; },
+    affTier() { const a = this.S.aff, B = CONFIG.BALANCE; return a >= B.love ? '高' : a >= B.night ? '中' : '低'; },
     expTier() { const e = this.S.exp; return e >= 85 ? '临界' : e >= 60 ? '危险' : e >= 30 ? '有苗头' : '安全'; },
     ambTier() { const m = this.S.amb; return m === 0 ? '0' : m < 30 ? '低' : m < 60 ? '中' : '高'; },
 

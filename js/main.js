@@ -110,7 +110,7 @@
       const id = 'day' + S.day;
       const ev = EVENTS[id];
       if (ev && !S.seen[id]) {
-        if (S.day === 72 && S.aff < 30) S.flags.cheat = true;
+        if (S.day === 72 && S.aff < CONFIG.BALANCE.cheat) S.flags.cheat = true;
         await Story.play(id);
         Game.remember(`发生了「${ev.title.replace(/（.*?）$/, '')}」`);
         if (this.checkExposure()) return;
@@ -137,7 +137,7 @@
       let f;
       if (Game.settings().apiKey) {
         UI.loading(true, '大家在刷手机…');
-        try { f = await API.feed(); } catch (e) { console.warn(e); UI.notify('pan', 'API 出错', e.message); }
+        try { f = await API.feed('A'); f.forum = []; f.fan_group = []; f._pendingB = true; } catch (e) { console.warn(e); UI.notify('pan', 'API 出错', e.message); }
         UI.loading(false);
       }
       if (!f) f = Phone.offlineFeed();
@@ -155,6 +155,22 @@
       else if (S.sub && f.bubble && f.bubble[0]) UI.notify('blink', 'BLINK · 徐允在', f.bubble[0].messages[0].ko, () => Phone.open('blink'));
       UI.updateBadge();
       this.checkExposure();
+      Game.autosave();
+      if (f._pendingB) this.genFeedB(S, day, f);
+    },
+
+    // 第二步：论坛 + 粉丝群，在后台生成，不挡玩家
+    async genFeedB(S, day, f) {
+      let b = null;
+      try { b = await API.feed('B', f); } catch (e) { console.warn(e); }
+      if (Game.S !== S) return;
+      f._pendingB = false;
+      if (b) { f.forum = b.forum || []; f.fan_group = b.fan_group || []; }
+      if (S.day === day) {
+        S.unread.pan = (f.forum || []).length;
+        UI.updateBadge();
+        if (Phone.view === 'pan' || Phone.view === 'post') Phone.go(Phone.view, Phone.arg);
+      }
       Game.autosave();
     },
 
@@ -188,7 +204,8 @@
         await new Promise(r => setTimeout(r, 1600));
       }
       S.day += 1;
-      if (S.day % 7 === 1) Game.applyFx({ exp: -3 }, 'event'); // 曝光自然回落：一周 −3
+      if (S.day % 7 === 1) Game.applyFx({ exp: -CONFIG.BALANCE.expWeeklyDecay }, 'event'); // 曝光自然回落
+      if (S.day % CONFIG.BALANCE.affDriftEvery === 0) Game.applyFx({ aff: -1 }, 'event'); // 各忙各的，感情慢慢淡一点
       S.unread.blink = 0; S.unread.pan = 0; S.unread.insta = 0;
       await UI.transition(`第 ${S.day} 天`, Game.dateStr(S.day), 1200);
       this.startDay();
@@ -214,8 +231,8 @@
       if (S.amb >= 60) song = '사랑과 전쟁';
       else if (S.flags.cheat) song = 'L.I.E';
       else if (S.exp >= 85) song = 'If You';
-      else if (S.aff >= 75 && S.flags.knot1 && S.flags.knot2) song = 'Love wins all';
-      else if (S.aff >= 40) song = '밤편지';
+      else if (S.aff >= CONFIG.BALANCE.love && S.flags.knot1 && S.flags.knot2) song = 'Love wins all';
+      else if (S.aff >= CONFIG.BALANCE.night) song = '밤편지';
       else song = '사랑이 잘';
       this.ending(song);
     },

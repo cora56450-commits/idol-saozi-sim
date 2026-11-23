@@ -35,7 +35,7 @@
       $('#cal-phase').textContent = SCHEDULE.phaseOf(S.day);
       this.updateBadge();
       this.show('scr-desk');
-      if (!Story.ev) { Sound.deskBgm(); this.tip('desk'); }
+      if (!Story.ev) { Sound.deskBgm(); this.deskTour(); }
     },
     updateBadge() {
       const n = Phone.unreadTotal();
@@ -225,6 +225,49 @@
     },
 
     // ---- 新手提示（每个只弹一次）----
+    // 第一次来到桌面：一个一个高亮桌上的东西，告诉玩家点它是干什么的
+    deskTour() {
+      const g = Game.global(); g.tips = g.tips || {};
+      if (g.tips.desk) return Promise.resolve();
+      g.tips.desk = 1; localStorage.setItem('idolsao_global', JSON.stringify(g));
+      const steps = [
+        ['.desk-calendar', '日历', '今天是第几天、几月几号、现在是什么时期（回归准备 / 打歌期 / 年末）。'],
+        ['[data-hot=phone]', '手机', '最常用的地方：和他私聊、看他的泡泡、刷论坛和 InstaSnap。图标上有红点就是有新消息。'],
+        ['[data-hot=note]', '便签', '他今天的行程。什么时候在录音、什么时候有空，看这里。'],
+        ['[data-hot=album]', '专辑', '存档、读档和设置（API、音量）都在这里。'],
+        ['[data-hot=polaroid]', '拍立得', '看过的结局和 CG 都收在这里，可以回想。'],
+        ['[data-hot=bento]', '便当', '这一天玩够了就吃便当：结束今天，进入第二天。']
+      ];
+      const desk = $('#scr-desk');
+      const ov = document.createElement('div'); ov.className = 'tour';
+      ov.innerHTML = '<div class="tour-hole"></div><div class="tour-box"><b></b><p></p><div class="tour-foot"><span class="tour-n"></span><button class="btn-small primary">下一个</button></div></div>';
+      desk.appendChild(ov);
+      return new Promise(res => {
+        let i = 0;
+        const show = () => {
+          const [sel, title, text] = steps[i];
+          const el = desk.querySelector(sel);
+          const W = desk.offsetWidth, H = desk.offsetHeight, pad = 10;
+          // 按屏幕上的实际位置算（日历用了 transform 居中，offsetLeft 不准），再换回舞台坐标
+          const dr = desk.getBoundingClientRect(), er = el.getBoundingClientRect(), k = dr.width / W;
+          const x = (er.left - dr.left) / k - pad, y = (er.top - dr.top) / k - pad, w = er.width / k + pad * 2, h = er.height / k + pad * 2;
+          Object.assign(ov.querySelector('.tour-hole').style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
+          const box = ov.querySelector('.tour-box');
+          box.querySelector('b').textContent = title; box.querySelector('p').textContent = text;
+          ov.querySelector('.tour-n').textContent = `${i + 1} / ${steps.length}`;
+          ov.querySelector('button').textContent = i === steps.length - 1 ? '开始吧' : '下一个';
+          const bw = 420, right = x + w / 2 < W / 2;
+          box.style.left = (right ? Math.min(x + w + 24, W - bw - 24) : Math.max(24, x - bw - 24)) + 'px';
+          box.style.top = Math.max(24, Math.min(y + h / 2 - 90, H - 220)) + 'px';
+        };
+        ov.querySelector('button').onclick = (e) => {
+          e.stopPropagation();
+          if (++i >= steps.length) { ov.remove(); res(); } else show();
+        };
+        show();
+      });
+    },
+
     tip(key) {
       const g = Game.global(); g.tips = g.tips || {};
       if (g.tips[key] || !TIPS[key]) return Promise.resolve();

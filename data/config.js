@@ -106,6 +106,16 @@ window.CONFIG = {
   ],
 
   // 结局 CG（assets/cg/）
+  // 结局名（真实歌名）的中文和原唱：结局标题卡、结局卡、拍立得里都会一起显示
+  ENDING_NAMES: {
+    'Love wins all': { zh: '爱赢过一切', artist: 'IU', kind: '公开' },
+    'If You': { zh: '如果你', artist: 'BIGBANG', kind: '被扒分手' },
+    '밤편지': { zh: '夜信', artist: 'IU', kind: '地下恋继续' },
+    'L.I.E': { zh: '谎言', artist: 'EXID', kind: '他劈腿' },
+    '사랑과 전쟁': { zh: '爱与战争', artist: 'Davichi', kind: '你劈腿' },
+    '사랑이 잘': { zh: '爱不下去了', artist: 'IU & 오혁', kind: '和平分手' }
+  },
+
   ENDING_CG: {
     'Love wins all': 'assets/cg/end_love.jpg', 'If You': 'assets/cg/end_ifyou.jpg', '밤편지': 'assets/cg/end_night.jpg',
     'L.I.E': 'assets/cg/end_lie.jpg', '사랑과 전쟁': 'assets/cg/end_war.jpg', '사랑이 잘': 'assets/cg/end_part.jpg'
@@ -124,6 +134,18 @@ window.CONFIG = {
     { ev: 'day84', choice: 1, img: 'ev_day84_1', name: '第 84 天 · 圣诞' }
   ],
 
+  // 数值平衡（11/23 按 90 天模拟调过，见 tools/balance_sim.py）
+  BALANCE: {
+    chatAffCap: 2,       // 每天聊天最多加多少感情（减的上限还是 4）
+    chatAffFloor: 4,
+    chatExpCap: 3,       // 每天聊天最多带来多少曝光
+    affDriftEvery: 2,    // 每隔几天感情自然 −1（见不到面、各忙各的）
+    expWeeklyDecay: 1,   // 曝光每周自然回落
+    love: 85,            // Love wins all 需要的感情值（还要两个心结都解开）
+    night: 50,           // 밤편지 需要的感情值，低于它是 사랑이 잘
+    cheat: 35            // 第 72 天感情低于它，进他劈腿线
+  },
+
   // 一直有效的事实：开局按身份写入；事件结束后（'dayN'）或选了某个选项后（'dayN#选项序号'）写入。
   // 每次调用 API 都会带上，避免 AI 前后矛盾。可以是字符串，或 {civ, staff} 分身份
   FACTS_START: {
@@ -138,7 +160,7 @@ window.CONFIG = {
     'day3#3': '她把他那份便当里的西兰花偷偷换成了芦笋，东旻已经发现「只有哥的不一样」',
     'day12': '东旻知道他们在交往，是团里唯一知情的人；从这天起有了三人群（允在、东旻、玩家）',
     'day16': '第 16 天回归日零点新歌发布；第二段有他的高音，录音时唱了十二遍，用的是第十一遍',
-    'day16#1': '第 16 天新歌一发布她就听了，夸了第二段的换气；他说那个换气是他自己改的，以为没人会注意到',
+    'day16#1': '第 16 天新歌一发布她就听了，夸了最后那句假声；他说那句本来是真声，是他录完求着制作人改成假声的',
     'day16#2': '第 16 天新歌发布时她先去粉丝群打卡，过了二十分钟才回他，他闹了点小别扭',
     'day20': '第 20 天 LUMIÈRE 拿了回归后第一个一位；他在获奖感言里说「也想谢谢一直照顾我吃饭的人」，被东旻抢话筒圆了过去，论坛有人开始猜是谁',
     'day20#1': '第 20 天她看完直播回他「你疯了吗」，骂他差点在台上说漏嘴',
