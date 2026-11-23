@@ -28,12 +28,47 @@
         Sound.sfx('vibrate');
         Phone.openStory(ev.kind === 'event' ? ev.title.replace(/（.*?）$/, '') : ev.title);
       }
+      this.prefetchKo(ev);
       if (ev.kind === 'ending' && CONFIG.ENDING_CG[ev.id.slice(4)]) this.setCG(CONFIG.ENDING_CG[ev.id.slice(4)], true);
       await UI.tip(this.mode === 'gal' ? 'gal' : 'phoneStory');
       await this.run(ev.blocks);
       if (this.mode === 'phone') Phone.closeStory();
       if (ev.kind === 'event') { S.seen[ev.id] = true; Game.addFact(ev.id); }
+      // 剧情里走到了几点，桌面的时间就从那里接着走（凌晨算当天夜里）
+      if (this.storyMin != null && ev.kind === 'event') { const t = this.storyMin < 360 ? this.storyMin + 1440 : this.storyMin; if (t > (S.minutes || 0)) S.minutes = t; }
       this.ev = null; this.storyMin = null;
+    },
+
+    // ---- 玩家在手机里说的固定台词：一次性在后台翻成韩文（存在浏览器里，下次不用再翻）----
+    koCache() { if (!this._ko) { try { this._ko = JSON.parse(localStorage.getItem('idolsao_ko') || '{}'); } catch (e) { this._ko = {}; } } return this._ko; },
+    koOf(zh) { return this.koCache()[zh] || ''; },
+    meLines(ev) {
+      const out = [];
+      const walk = (bs) => bs.forEach(b => {
+        if (b.t === 'me' && b.zh) out.push(b.zh);
+        if (b.t === 'choice') b.options.forEach(o => { const q = this.quoteOf(o); if (q) out.push(q); walk(o.after || []); });
+      });
+      walk(ev.blocks || []);
+      return [...new Set(out)];
+    },
+    async prefetchKo(ev) {
+      if (!Game.settings().apiKey || ev.mode !== 'phone') return;
+      const C = this.koCache(), need = this.meLines(ev).filter(z => !C[z]);
+      if (!need.length) return;
+      try {
+        const ko = await API.translateKo(need);
+        need.forEach((z, i) => { if (ko[i]) C[z] = ko[i]; });
+        try { localStorage.setItem('idolsao_ko', JSON.stringify(C)); } catch (e) {}
+        // 已经显示出来的、已经记进聊天记录的，补上韩文
+        need.forEach(z => { if (C[z]) Phone.fillMeKo(z, C[z]); });
+        Object.values(Game.S.chats).forEach(list => list.forEach(m => { if (m.me && !m.ko && C[m.zh]) m.ko = C[m.zh]; }));
+      } catch (e) { console.warn('翻译失败', e); }
+    },
+    // 选项本身是一句话（「不行。」）或者带着「」引号的那一句
+    quoteOf(o) {
+      if (o.say) return o.label;
+      const q = (o.label.match(/「([^」]+)」?/) || [])[1];
+      return q && !/写/.test(o.label) ? q : '';
     },
 
     // 文案里的〔素人：A｜员工：B〕按身份换成对应的那段
@@ -179,9 +214,10 @@
       if ((this.mode === 'phone' || b.ch === 'chat') && (b.t === 'say' || b.t === 'me' || b.t === 'photo')) {
         const map = { '他': 'he', '东旻': (Game.S.day >= 12 ? 'group' : 'dongmin'), '柳时元': 'siwon', '郑书娟': 'friend', '宋恩智': 'eunji', '弟弟': 'brother' };
         if (b.ch === 'bubble' || b.who === '论坛') return;
-        const cid = b.t === 'me' ? 'he' : map[b.who];
+        let cid = b.t === 'me' ? 'he' : map[b.who];
+        if (this.mode === 'phone' && Phone.storyChat && (b.t === 'me' || b.who === '他')) cid = Phone.storyChat; // 和画面上的聊天一致（三人群 / 私聊）
         if (!cid) return;
-        const m = b.t === 'me' ? { me: true, zh: b.zh } : b.t === 'photo' ? { type: 'photo', note: b.text || '（照片）', speaker: b.who } : { ko: b.ko, zh: b.zh, speaker: b.who, type: b.vtype, note: b.note };
+        const m = b.t === 'me' ? { me: true, zh: b.zh, ko: b.ko || this.koOf(b.zh) || undefined } : b.t === 'photo' ? { type: 'photo', note: b.text || '（照片）', speaker: b.who } : { ko: b.ko, zh: b.zh, speaker: b.who, type: b.vtype, note: b.note };
         m.day = Game.S.day; m.fromEvent = true;
         (Game.S.chats[cid] = Game.S.chats[cid] || []).push(m);
       }
@@ -189,7 +225,7 @@
 
     section(text) {
       if (this.mode === 'gal') $('#scene-section').innerHTML = `<span>${esc(text)}</span>`;
-      else Phone.storyAppend(`<div class="sec">${esc(text)}</div>`);
+      else { const app = Phone.appOf({ t: 'section', text }); if (app) Phone.switchStoryApp(app); Phone.storyAppend(`<div class="sec">${esc(text)}</div>`); }
     },
 
     lineHTML(b) {
@@ -213,6 +249,7 @@
         } else plate.classList.add('empty');
         $('#dlg-text').innerHTML = this.lineHTML(b);
       } else {
+        if (b.t === 'me' && !b.ko && this.koOf(b.zh)) b = Object.assign({}, b, { ko: this.koOf(b.zh) });
         Phone.storyLine(b);
       }
     },
@@ -248,9 +285,10 @@
       if (cgc) await this.showCG(cgc.img);
 
       // 选项里带着引号的话（「听了，高音很好。」）= 你说出口的话，先显示出来
-      const q = (o.label.match(/「([^」]+)」?/) || [])[1];
+      // 线下场景里，整个选项就是当面说的话；选项里夹着「」的那种（「先回他：……」）在线下场景里是发的消息
+      const q = this.quoteOf(o);
       const first = (o.after || []).find(x => Game.check(x.if));
-      if (q && !/写/.test(o.label) && !(first && first.t === 'me')) { const mb = { t: 'me', zh: q, ch: this.mode === 'phone' ? undefined : 'chat' }; this.show(mb); this.logLine(mb); await this.wait(); }
+      if (q && !(first && first.t === 'me')) { const mb = { t: 'me', zh: q, ch: this.mode === 'phone' || o.say ? undefined : 'chat' }; this.show(mb); this.logLine(mb); await this.wait(); }
       await this.run(o.after);
     },
 
@@ -288,6 +326,7 @@
         const ctx = { isLast: i >= 0 && rest.length === 0, next: i >= 0 ? this.upcoming(cb, 10) : '' };
         const j = await API.storyFree(this.ev, this.log.join('\n'), opts, text, ctx);
         UI.loading(false);
+        if (j.player_ko) this.fillKo(text, j.player_ko);
         S.lastChoice = 0;
         Game.applyFx(j.fx, 'event');
         (j.flags || []).forEach(f => { if (['knot1', 'knot2'].includes(f)) Game.setFlag(f); });
@@ -301,6 +340,12 @@
         this.show({ t: 'nar', text: '（API 出错了：' + e.message + '。按第一个选项继续。）' }); await this.wait();
         const o = opts[0]; S.lastChoice = 1; Game.applyFx(o.fx, 'event'); await this.run(o.after);
       }
+    },
+
+    // 自己打的字翻好了：补到气泡和聊天记录上
+    fillKo(zh, ko) {
+      Phone.fillMeKo(zh, ko);
+      Object.values(Game.S.chats).forEach(list => { for (let k = list.length - 1; k >= Math.max(0, list.length - 6); k--) { const m = list[k]; if (m.me && m.zh === zh && !m.ko) { m.ko = ko; break; } } });
     },
 
     // 当前事件里某个块后面的固定内容（给 API 参考，避免前后矛盾）
@@ -326,8 +371,7 @@
         const j = await API.chat('he', text, this.upcoming(b, 12));
         UI.loading(false);
         Game.applyFx(j.delta, 'chat');
-        const last = S.chats.he[S.chats.he.length - 1];
-        if (last && last.me && j.player_ko) last.ko = j.player_ko;
+        if (j.player_ko) this.fillKo(text, j.player_ko);
         for (const r of (j.replies || [])) {
           const blk = r.type === 'photo' ? { t: 'photo', who: '他', text: r.note }
             : r.type === 'voice' ? { t: 'say', who: '他', vtype: 'voice', ko: r.ko, zh: r.zh, note: r.note }

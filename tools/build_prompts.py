@@ -8,6 +8,7 @@ P = {
  'chatOther': bs[6], 'chatOtherFormat': bs[7], 'chatOtherEx': [bs[8], bs[9]],
  'feed': bs[10], 'feedFormat': bs[11], 'feedEx': [bs[12]],
  'post': bs[14], 'postFormat': bs[15], 'postEx': [bs[16]],
+ 'date': bs[17], 'dateFormat': bs[18],
 }
 open(sys.argv[2], 'w', encoding='utf-8').write(
  '// 由 tools/build_prompts.py 从「API提示词.md」生成；改提示词请改 md 后重新运行\nwindow.PROMPTS = ' +

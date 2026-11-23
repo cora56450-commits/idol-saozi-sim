@@ -71,8 +71,9 @@
     close() {
       if (Story.ev && Story.mode === 'phone') return;
       $('#phone').classList.add('hidden');
-      UI.updateBadge();
+      UI.updateBadge(); UI.deskStats();
       Game.autosave();
+      if (window.Main && Main.checkDate) Main.checkDate(); // 聊着聊着到了约好的时间：放下手机他就到了
     },
 
     go(view, arg) {
@@ -125,7 +126,7 @@
         const c = Game.CHATS[id], msgs = S.chats[id], last = msgs[msgs.length - 1];
         const lastText = last ? (last.type === 'sticker' ? '[表情]' : last.type === 'photo' ? '[照片]' : last.type === 'voice' ? '[语音]' : (last.ko || last.zh)) : '';
         const n = S.unread[id] || 0;
-        return `<div class="item" data-chat="${id}">${avatarHTML(id, c.short)}<div class="meta"><div class="nm">${esc(c.name)}</div><div class="last">${esc(lastText)}</div></div>${n ? `<div class="cnt">${n}</div>` : ''}</div>`;
+        return `<div class="item" data-chat="${id}">${avatarHTML(id, c.short)}<div class="meta"><div class="nm">${esc(c.name)}</div><div class="desc">${esc(c.desc || '')}</div><div class="last">${esc(lastText)}</div></div>${n ? `<div class="cnt">${n}</div>` : ''}</div>`;
       }).join('');
       return `<div class="app toktok">${statusBar(true)}${head('TOKTOK', '톡톡')}<div class="app-body chat-list">${items}</div></div>`;
     },
@@ -133,6 +134,7 @@
     msgHTML(m, chatId) {
       // 语音：显示时长条 + 下面直接转成文字
       if (m.sep) return `<div class="day-sep">${esc(m.sep)}</div>`;
+      if (m.sys) return `<div class="day-sep sys">${esc(m.sys)}</div>`;
       const me = !!m.me;
       let inner;
       if (m.type === 'sticker') {
@@ -161,7 +163,7 @@
         if (m.day && m.day !== lastDay) { out += this.msgHTML({ sep: Game.dateStr(m.day) }, id); lastDay = m.day; }
         out += this.msgHTML(m, id);
       }
-      if (!out) out = `<div class="empty-tip">还没有消息</div>`;
+      out = `<div class="chat-intro">${esc(c.desc || '')}</div>` + (out || `<div class="empty-tip">还没有消息</div>`);
       return `<div class="app toktok">${statusBar(true)}${head(c.name, '', 'toktok')}<div class="app-body"><div class="msgs" id="msgs">${out}</div></div>
         <div class="app-foot"><textarea id="chat-in" placeholder="打中文，发出去会变成韩文"></textarea><button class="send" id="chat-send"><img src="assets/ui/ic_send.png" alt=""></button></div></div>`;
     },
@@ -195,7 +197,10 @@
         const j = await API.chat(id, text);
         if (j.player_ko) me.ko = j.player_ko;
         Game.applyFx(j.delta, 'chat');
-        if (j.flags && j.flags.includes('date_promised') && j.date) Game.remember('约好了：' + j.date);
+        if (j.flags && j.flags.includes('date_promised') && j.date && (typeof j.date === 'string' || Object.keys(j.date).length)) {
+          const d = Game.addDate(j.date);
+          if (d) { Game.remember(`约好了：${d.day === S.day ? '今天' : '明天'} ${d.time} ${d.place}（${d.what}）`); S.chats[id].push({ sys: `约好了 · ${d.day === S.day ? '今天' : '明天'} ${d.time} · ${d.place}`, day: S.day }); UI.deskStats(); }
+        }
         this.go('chat', id);
         for (const r of (j.replies || [])) {
           await sleep(700 + Math.random() * 1200);
@@ -229,7 +234,7 @@
       }
       S.unread[id] = (S.unread[id] || 0) + replies.length;
       const first = replies[0];
-      if (first) UI.notify('toktok', Game.CHATS[id].name, first.type === 'sticker' ? '[表情]' : (first.ko || '[消息]'), () => { this.open('home'); this.go('chat', id); });
+      if (first && !Story.ev) UI.notify('toktok', Game.CHATS[id].name, first.type === 'sticker' ? '[表情]' : (first.ko || '[消息]'), () => { this.open('home'); this.go('chat', id); });
       UI.updateBadge();
     },
 
@@ -272,7 +277,7 @@
       const today = Game.S.feeds[Game.S.day];
       const pending = today && today._pendingB ? '<div class="day-sep">今天的帖子还在刷新…</div>' : '';
       const items = posts.map(({ d, i, p }) => `<div class="post" data-post="${d}:${i}">
-        <div class="pt">${p.hot ? '<img src="assets/ui/ic_hot.png" alt="HOT">' : ''}<span>${esc(p.title_ko)}</span></div>
+        <div class="pt">${p.hot ? '<img src="assets/ui/ic_hot.png" alt="HOT">' : ''}${p._read ? '' : '<b class="tag-new">NEW</b>'}<span>${esc(p.title_ko)}</span></div>
         <div class="pz">${esc(p.title_zh)}</div>
         <div class="pm">${(p.comments || []).length} 评论 · ${(p.views || 0).toLocaleString()} 浏览 · ${esc(Game.dateStr(d).slice(5, 10))}</div></div>`).join('');
       return `<div class="app pan">${statusBar()}${head('더쿠판', 'THEQOOPAN')}<div class="pan-tabs"><div class="on">스퀘어</div><div>핫게</div><div>루미에르</div></div>
@@ -281,6 +286,7 @@
     panPost(key) {
       const [d, i] = key.split(':').map(Number);
       const p = Game.S.feeds[d].forum[i];
+      p._read = true;
       const cm = (p.comments || []).map(c => `<div class="cmt ${c.mine ? 'mine' : ''}"><div class="who">${c.floor ? c.floor + '. ' : ''}${c.author === '원판러' ? '<b>원판러</b>' : esc(c.author || '무명의 판러')}</div>${esc(c.ko)}<span class="zh">${esc(c.zh)}</span>${c.note ? `<span class="zh"><i>${esc(c.note)}</i></span>` : ''}</div>`).join('');
       return `<div class="app pan">${statusBar()}${head('더쿠판', '', 'pan')}<div class="app-body"><div class="pan-post">
         <div class="pt">${esc(p.title_ko)}</div><div class="pz">${esc(p.title_zh)}</div>
@@ -310,7 +316,7 @@
         ${(() => { const im = igPhoto(p, d * 7 + i); return im
           ? `<div class="ig-photo has-img"><img src="assets/insta/${im}.jpg" alt="" onerror="this.parentNode.classList.remove('has-img');this.remove()"><span class="ig-note">${esc(p.note || '')}</span></div>`
           : `<div class="ig-photo">${esc(p.note || '')}</div>`; })()}
-        <div class="ig-acts"><img src="assets/ui/ic_heart.png" alt=""><img src="assets/ui/ic_comment.png" alt=""><span>${(p.likes || 0).toLocaleString()}</span></div>
+        <div class="ig-acts"><img class="ig-like ${p.liked ? 'on' : ''}" data-like="${d}:${i}" src="assets/ui/ic_heart.png" alt="赞"><img class="ig-cm" data-cm="${d}:${i}" src="assets/ui/ic_comment.png" alt="评论"><span>${((p.likes || 0) + (p.liked ? 1 : 0)).toLocaleString()}</span></div>
         <div class="ig-cap">${esc(p.caption_ko)}<span class="zh">${esc(p.caption_zh)}</span></div>
         <div class="ig-cmts">${(p.comments || []).map(c => `<div class="cmt ${c.mine ? 'mine' : ''}"><b>${esc(c.account)}</b> ${esc(c.ko)}<span class="zh">${esc(c.zh)}</span></div>`).join('')}</div>
         <div class="ig-reply"><input data-ig="${d}:${i}" placeholder="用小号评论…"><button data-igs="${d}:${i}">发布</button></div></div>`));
@@ -362,6 +368,14 @@
       }
       if (view === 'insta') {
         $$('[data-tab]', root).forEach(t => t.onclick = () => this.go('insta', t.dataset.tab));
+        $$('[data-like]', root).forEach(h => h.onclick = () => {
+          const [d, i] = h.dataset.like.split(':').map(Number), p = S.feeds[d].instasnap[i];
+          p.liked = !p.liked;
+          h.classList.toggle('on', p.liked); h.classList.remove('pop'); void h.offsetWidth; if (p.liked) h.classList.add('pop');
+          h.parentNode.querySelector('span').textContent = ((p.likes || 0) + (p.liked ? 1 : 0)).toLocaleString();
+          if (p.liked) Game.remember(`小号给 ${p.account} 的 InstaSnap 点了赞`);
+        });
+        $$('[data-cm]', root).forEach(c => c.onclick = () => { const inp = root.querySelector(`[data-ig="${c.dataset.cm}"]`); if (inp) inp.focus(); });
         $$('[data-igs]', root).forEach(b => b.onclick = () => {
           const [d, i] = b.dataset.igs.split(':').map(Number);
           const p = S.feeds[d].instasnap[i];
@@ -396,32 +410,146 @@
     },
 
     // ---------- 手机事件播放 ----------
+    // 剧情里的手机会跟着内容切 App：私聊在 TOKTOK，泡泡在 BLINK，论坛在 더쿠판，粉丝群在 InstaSnap。
+    // 每个 App 有自己的记录，切回来还在；剧情里出现的泡泡 / 帖子 / 群消息也会写进当天的 App。
+    STORY_APPS: {
+      toktok: { cls: 'toktok', title: 'TOKTOK', sub: '톡톡', light: true },
+      blink: { cls: 'blink', title: '徐允在', sub: 'BLINK · LUMIÈRE' },
+      pan: { cls: 'pan', title: '더쿠판', sub: 'THEQOOPAN' },
+      fan: { cls: 'insta', title: 'InstaSnap', sub: '달빛수집가 粉丝群' }
+    },
     openStory(title) {
       $('#phone').classList.remove('hidden');
       $('#phone-close').classList.add('hidden');
-      scr().innerHTML = `<div class="app">${statusBar()}<div class="app-head"><div class="title" style="padding:0">${esc(title)}</div></div>
-        <div class="app-body" style="position:relative"><div class="story-log" id="story-log"></div></div>
+      const logs = Object.keys(this.STORY_APPS).filter(k => k !== 'toktok').map(k => `<div class="story-log" data-app="${k}"></div>`).join('');
+      scr().innerHTML = `<div class="app story-app toktok">${statusBar(true)}<div class="app-head"><div class="title" style="padding:0"></div></div>
+        <div class="app-body" style="position:relative">${logs}</div>
         <div class="story-tap" id="story-tap">点击继续 ▼</div></div>`;
-      this.view = 'story';
+      this.view = 'story'; this.storyApp = null; this.storyTitle = title; this.storyChat = 'he';
+      this.switchStoryApp('toktok', true);
+    },
+    switchStoryApp(k, quiet) {
+      if (k === 'toktok') k = 'c_' + (this.storyChat || 'he');
+      if (this.storyApp === k) return;
+      const app = $('.story-app', scr()); if (!app) return;
+      let A = this.STORY_APPS[k];
+      if (k.startsWith('c_')) { // TOKTOK 里的某一个聊天：标题就是聊天名
+        const c = Game.CHATS[k.slice(2)] || Game.CHATS.he;
+        A = { cls: 'toktok', title: c.name, sub: 'TOKTOK', light: true };
+        if (!$(`.story-log[data-app="${k}"]`, app)) $('.app-body', app).insertAdjacentHTML('beforeend', `<div class="story-log" data-app="${k}"></div>`);
+      }
+      const old = $('#story-log', scr()); if (old) old.removeAttribute('id');
+      $$('.story-log', app).forEach(l => l.classList.toggle('on', l.dataset.app === k));
+      const log = $(`.story-log[data-app="${k}"]`, app); log.id = 'story-log';
+      Object.values(this.STORY_APPS).forEach(a => app.classList.remove(a.cls));
+      app.classList.add(A.cls);
+      const sb = $('.status-bar', app); if (sb) sb.classList.toggle('light', !!A.light);
+      $('.app-head .title', app).innerHTML = `${esc(A.title)}<small>${esc(A.sub)}</small>`;
+      this.storyApp = k;
+      if (!quiet) Sound.sfx(k === 'blink' ? 'bubble' : 'msg');
+      const pad = $('.story-choices', app); this.padLog(pad || null);
+    },
+    // 这一行属于哪个 App
+    appOf(b) {
+      if (b.ch === 'bubble') return Game.S.sub ? 'blink' : 'pan';
+      if (b.who === '论坛') return 'pan';
+      if (/^(粉丝群|群主|群友|粉丝)/.test(b.who || '')) return 'fan';
+      if (b.t === 'section') { // 小标题写明了是哪个 App 的，就先切过去
+        const t = b.text || '';
+        if (/泡泡|BLINK/.test(t)) return Game.S.sub ? 'blink' : 'pan';
+        if (/论坛|더쿠판/.test(t)) return 'pan';
+        if (/粉丝群/.test(t)) return 'fan';
+        if (/私聊|三人群|群聊/.test(t)) { this.chatHint(t); return 'toktok'; }
+        return null;
+      }
+      if (b.t === 'nar') { // 旁白提到「群里 / 私聊」：在 TOKTOK 里就直接切到那个聊天
+        const before = this.storyChat; this.chatHint(b.text || '');
+        return this.storyChat !== before && (this.storyApp || '').startsWith('c_') ? 'toktok' : null;
+      }
+      this.storyChat = this.chatOf(b);
+      return 'toktok';
+    },
+    // 旁白里说「单独私聊你」「在群里」：之后他的话放到对应的聊天
+    chatHint(t) {
+      t = t.replace(/粉丝群|群主|群友/g, '＿');
+      const groupOK = Game.S.day >= 12 || Game.S.seen.day12 || Game.S.day === 12;
+      const p = Math.max(t.lastIndexOf('私聊'), t.lastIndexOf('单独')), g = Math.max(t.lastIndexOf('群里'), t.lastIndexOf('群聊'), t.lastIndexOf('三人群'));
+      if (p < 0 && g < 0) return;
+      this.storyChat = (g > p && groupOK) ? 'group' : 'he';
+    },
+    // 这句话在 TOKTOK 的哪个聊天里
+    chatOf(b) {
+      const cur = this.storyChat || 'he', groupOK = Game.S.day >= 12 || Game.S.seen.day12;
+      const fixed = { '郑书娟': 'friend', '弟弟': 'brother', '宋恩智': 'eunji', '柳时元': 'siwon', '白秀珍': 'shop', '吴叡琳': 'shop' }[b.who];
+      if (fixed) return fixed;
+      if (b.who === '东旻') return groupOK ? 'group' : 'dongmin';
+      if (b.t === 'me' || b.who === '他' || b.t === 'photo') return ['he', 'group'].includes(cur) || b.t === 'me' ? cur : 'he';
+      return cur;
     },
     closeStory() {
       $('#phone-close').classList.remove('hidden');
       $('#phone').classList.add('hidden');
-      this.view = 'home';
+      this.view = 'home'; this.storyApp = null;
     },
     storyAppend(html) {
       const log = $('#story-log'); if (!log) return;
       log.insertAdjacentHTML('beforeend', html);
       log.scrollTop = log.scrollHeight;
     },
+    // 剧情里出现的泡泡 / 帖子 / 粉丝群消息，记到当天（每日动态生成后合进对应 App）
+    keepStoryFeed(app, b) {
+      const S = Game.S; S.storyFeed = S.storyFeed || {};
+      const x = S.storyFeed[S.day] = S.storyFeed[S.day] || { bubble: [], forum: [], fan_group: [] };
+      if (app === 'blink') {
+        let g = x.bubble[x.bubble.length - 1];
+        if (!g || this._lastKept !== g) { g = { time: UI.clock(), messages: [], story: true }; x.bubble.push(g); }
+        g.messages.push(b.vtype === 'voice' ? { type: 'voice', ko: b.ko, zh: b.zh, note: b.note } : { type: 'text', ko: b.ko, zh: b.zh, note: '' });
+        this._lastKept = g;
+      } else if (app === 'pan' && b.who === '论坛') {
+        let p = x.forum[x.forum.length - 1];
+        if (b.manner === '标题' || !p || this._lastKept !== p) {
+          p = { title_ko: b.ko, title_zh: b.zh, hot: true, views: 8000 + Math.floor(Math.random() * 30000), body_ko: '', body_zh: '', comments: [], story: true };
+          x.forum.push(p);
+          if (b.manner !== '标题') { p.title_ko = b.ko; p.title_zh = b.zh; }
+        } else p.comments.push({ floor: p.comments.length + 1, author: '무명의 판러', ko: b.ko, zh: b.zh });
+        this._lastKept = p;
+      } else if (app === 'fan') {
+        x.fan_group.push({ speaker: N(b.who), ko: b.ko, zh: b.zh, time: UI.clock() });
+        this._lastKept = null;
+      }
+    },
     storyLine(b) {
+      const app = this.appOf(b);
+      if (app) this.switchStoryApp(app);
+      else this._lastKept = null;
+      const cur = this.storyApp;
       if (b.t === 'nar') return this.storyAppend(`<div class="nar">${esc(b.text)}</div>`);
-      if (b.t === 'me') return this.storyAppend(this.msgHTML({ me: true, zh: b.zh }, 'he'));
+      if (b.t === 'me') return this.storyAppend(this.msgHTML({ me: true, zh: b.zh, ko: b.ko }, 'he').replace('<div class="msg me">', `<div class="msg me" data-mezh="${esc(b.zh)}">`));
       if (b.t === 'photo') return this.storyAppend(this.msgHTML({ type: 'photo', note: b.text, speaker: b.who }, 'he'));
-      if (b.who === '论坛') return this.storyAppend(`<div class="cmt" style="background:#fff;padding:8px 12px;border:1px solid #e2ddd7"><div class="who">${b.manner === '标题' ? '<b>더쿠판 · 帖子</b>' : '무명의 판러'}</div>${esc(b.ko)}<span class="zh">${esc(b.zh)}</span></div>`);
+      if (cur === 'pan') {
+        if (b.who !== '论坛') { // 没订阅：泡泡是论坛里的截图
+          this.storyAppend(`<div class="cmt story-shot"><div class="who">BLINK 截图 · 徐允在</div>${esc(b.ko)}<span class="zh">${esc(b.zh)}</span></div>`);
+          return;
+        }
+        this.keepStoryFeed('pan', b);
+        if (b.manner === '标题') { this._floor = 0; return this.storyAppend(`<div class="pan-post story-post"><div class="pt">${esc(b.ko)}</div><div class="pz">${esc(b.zh)}</div></div>`); }
+        this._floor = (this._floor || 0) + 1;
+        return this.storyAppend(`<div class="cmt"><div class="who">${this._floor}. 무명의 판러</div>${esc(b.ko)}<span class="zh">${esc(b.zh)}</span></div>`);
+      }
+      if (cur === 'fan') {
+        this.keepStoryFeed('fan', b);
+        return this.storyAppend(`<div class="msg">${avatarHTML('fan', N(b.who))}<div class="col"><div class="who">${esc(N(b.who))}</div><div class="bubble">${esc(b.ko)}<span class="zh">${esc(b.zh)}</span></div></div></div>`);
+      }
+      if (cur === 'blink') this.keepStoryFeed('blink', b);
       const m = { ko: b.ko, zh: b.zh, speaker: b.who, type: b.vtype, note: b.note };
-      const html = this.msgHTML(m, b.who === '他' ? 'he' : 'group');
-      this.storyAppend(b.ch === 'bubble' ? html.replace('<div class="col">', '<div class="col"><div class="who">BLINK</div>') : html);
+      this.storyAppend(this.msgHTML(m, cur === 'c_group' ? 'group' : (b.who === '他' ? 'he' : 'group')));
+    },
+    // 玩家的话翻好韩文以后，补到已经显示的气泡上
+    fillMeKo(zh, ko) {
+      $$('[data-mezh]', scr()).forEach(el => {
+        if (el.dataset.mezh !== zh) return;
+        const bub = el.querySelector('.bubble'); if (bub && !bub.querySelector('.zh')) bub.innerHTML = `${esc(ko)}<span class="zh">${esc(zh)}</span>`;
+      });
     },
     storyChoices(labels, cb) {
       const app = $('.app', scr());

@@ -206,8 +206,10 @@ for raw in lines:
             fx, flags = parse_fx(fxm.group(1)); tail = fxm.group(2)
             label = label[:fxm.start()].strip()
         label = label.strip()
-        if label.startswith('「') and label.endswith('」') and label.count('「') == 1: label = label[1:-1]
+        said = False
+        if label.startswith('「') and label.endswith('」') and label.count('「') == 1: label = label[1:-1]; said = True
         opt = {'label': label, 'fx': fx, 'flags': flags, 'after': []}
+        if said: opt['say'] = True  # 整个选项就是一句说出口的话：选了以后先作为玩家的消息显示
         if tail: opt['after'].append({'t': 'nar', 'text': tail})
         choice['options'].append(opt); continue
     if nested and opt is not None:

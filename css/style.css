@@ -365,3 +365,38 @@ input, textarea { font-family: inherit; }
 .tour-box p { font-size: 19px; line-height: 1.6; margin: 0 0 16px; color: #222; }
 .tour-foot { display: flex; justify-content: space-between; align-items: center; }
 .tour-n { font-size: 15px; color: #8a847e; }
+.ec-text em { display: block; font-style: normal; font-size: 15px; color: #8e1b2a; margin-top: 2px; }
+
+/* 手机剧情：跟着内容切 App（11/23 第五轮） */
+.story-app .story-log { display: none; }
+.story-app .story-log.on { display: flex; }
+.story-app.pan .story-log { background: #fff; }
+.story-app.pan .story-log .cmt { padding: 8px 12px; border-bottom: 1px solid #eee; }
+.story-app .story-post { padding: 6px 2px 10px; border-bottom: 2px solid var(--ink); }
+.story-app .story-shot { background: #faf8f6; border: 1px dashed #bbb; padding: 8px 12px; }
+.story-app.pan .story-tap { background: linear-gradient(transparent, #fff 40%); }
+.chat-list .desc { font-size: 11px; color: #a09a94; margin-top: 2px; line-height: 1.35; }
+.chat-intro { margin: 10px auto 4px; max-width: 86%; padding: 6px 12px; font-size: 12px; color: #8a847e; text-align: center; background: rgba(0,0,0,.04); border-radius: 12px; }
+.pan-list .tag-new { flex: none; height: 18px; padding: 0 6px; margin-top: 1px; border-radius: 9px; background: var(--ink); color: #fff; font-size: 11px; line-height: 18px; font-weight: 700; letter-spacing: .5px; }
+.ig-acts img { cursor: pointer; }
+.ig-acts .ig-like.on { filter: invert(14%) sepia(77%) saturate(4200%) hue-rotate(340deg) brightness(.9); }
+.ig-acts .ig-like.pop { animation: igpop .35s ease; }
+@keyframes igpop { 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+
+/* 桌面常驻：时间 + 数值 + 往后过 */
+.desk-stats { position: absolute; left: 50%; top: 330px; width: 300px; transform: translateX(-50%); padding: 14px 18px 14px; background: rgba(251, 248, 244, .94); border: 1px solid var(--ink); box-shadow: 0 6px 18px rgba(0,0,0,.18); z-index: 5; }
+.ds-time { font-size: 30px; font-weight: 900; line-height: 1; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ds-time small { font-size: 14px; font-weight: 400; color: var(--grey); }
+.ds-date { margin-top: 8px; padding: 4px 8px; background: var(--red); color: #fff; font-size: 14px; text-align: center; }
+.ds-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 15px; }
+.ds-row span { width: 36px; flex: none; }
+.ds-row i { flex: 1; height: 8px; background: #e4dfd9; position: relative; }
+.ds-row i b { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); }
+.ds-row.aff i b { background: var(--red); }
+.ds-row.amb i b { background: #6b7a8f; }
+.ds-row em { width: 30px; flex: none; text-align: right; font-style: normal; font-weight: 700; }
+.ds-next { display: block; width: 100%; margin-top: 12px; height: 38px; background: var(--ink); color: #fff; font-size: 15px; cursor: pointer; }
+.ds-next:hover { background: var(--red); }
+.ds-late { margin-top: 12px; font-size: 13px; color: var(--grey); text-align: center; }
+.day-sep.sys { color: var(--red); }
+.choices .date-leave { margin-top: 10px; }

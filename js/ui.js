@@ -21,10 +21,10 @@
 
     // ---- 游戏内时钟（分钟）----
     clock() {
-      const m = (window.Story && Story.ev && Story.storyMin != null) ? Story.storyMin : ((Game.S && Game.S.minutes) || 600);
+      const m = (window.Story && Story.ev && Story.storyMin != null) ? Story.storyMin : ((Game.S && Game.S.minutes) || 510);
       return `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
     },
-    tick(min) { if (Game.S) Game.S.minutes = Math.min(((Game.S.minutes) || 600) + min, 23 * 60 + 59); },
+    tick(min) { if (Game.S) { Game.S.minutes = Math.min(((Game.S.minutes) || 510) + min, 26 * 60 + 59); this.deskStats(); } },
 
     // ---- 桌面 ----
     renderDesk() {
@@ -33,9 +33,21 @@
       $('#cal-day').textContent = `第 ${S.day} 天`;
       $('#cal-date').textContent = Game.dateStr(S.day);
       $('#cal-phase').textContent = SCHEDULE.phaseOf(S.day);
+      this.deskStats();
       this.updateBadge();
       this.show('scr-desk');
       if (!Story.ev) { Sound.deskBgm(); this.deskTour(); }
+    },
+    // 桌面常驻：现在几点、在干嘛、数值、往后过
+    deskStats() {
+      const S = Game.S, el = $('#desk-stats'); if (!S || !el) return;
+      const bar = (k, v, cls) => `<div class="ds-row ${cls}"><span>${k}</span><i><b style="width:${v}%"></b></i><em>${v}</em></div>`;
+      const nx = Game.nextSlot(), d = Game.pendingDate();
+      el.innerHTML = `<div class="ds-time">${UI.clock()}<small>${esc(Game.workStatus().replace(/，.*$/, ''))}</small></div>
+        ${d ? `<div class="ds-date">约好了 · ${esc(d.time)} · ${esc(d.place)}</div>` : ''}
+        ${bar('感情', S.aff, 'aff')}${bar('曝光', S.exp, 'exp')}${S.amb > 0 ? bar('暧昧', S.amb, 'amb') : ''}
+        ${nx ? `<button class="ds-next" id="ds-next">往后过 ▸ ${Game.hhmm(nx[0])} ${esc(nx[1])}</button>` : `<div class="ds-late">今天很晚了，吃完便当睡觉吧</div>`}`;
+      const b = $('#ds-next', el); if (b) b.onclick = () => Main.skipTime();
     },
     updateBadge() {
       const n = Phone.unreadTotal();
@@ -213,7 +225,7 @@
         : `<div class="cg-thumb locked"><span>?</span></div>`).join('');
       this.modal(`<h2>结局</h2><div class="gallery">${list.map(([s, n]) => `
         <div class="ending-card ${g[s] ? '' : 'locked'}" ${g[s] && ecg(s) ? `data-cg="${ecg(s)}"` : ''} style="${g[s] ? 'cursor:pointer' : ''}"><div class="ec-img" ${g[s] && ecg(s) ? `style="background-image:url(${ecg(s).replace('.jpg', '_s.jpg')})"` : ''}>${g[s] ? '' : '?'}</div>
-        <div class="ec-text"><b>‘${esc(g[s] ? s : '？？？')}’</b><span>${g[s] ? esc(n) : '未达成'}</span></div></div>`).join('')}</div>
+        <div class="ec-text"><b>‘${esc(g[s] ? s : '？？？')}’</b>${g[s] ? `<em>${esc((CONFIG.ENDING_NAMES[s] || {}).zh || '')}</em>` : ''}<span>${g[s] ? esc(n) : '未达成'}</span></div></div>`).join('')}</div>
         <div class="gallery-sec">CG</div><div class="cg-grid">${evThumbs}</div>`, (root) => {
         $$('[data-cg]', root).forEach(el => el.onclick = () => {
           const v = $('#cg-view');
@@ -300,7 +312,7 @@
         if (k === 'amb+') S.amb = Math.min(100, S.amb + 10);
         if (k === 'jump') { S.day = Math.max(1, Math.min(90, +$('#dbg-day').value)); Main.startDay(); }
         if (k === 'ev') { delete S.seen['day' + S.day]; Main.startDay(); }
-        this.debugRefresh();
+        this.debugRefresh(); this.deskStats();
       });
     }
   };

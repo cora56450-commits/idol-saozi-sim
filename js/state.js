@@ -4,15 +4,17 @@
   const SETTINGS_KEY = 'idolsao_settings';
   const GLOBAL_KEY = 'idolsao_global';
 
+  // desc：通讯录里名字旁边的一句介绍
   const CHATS = {
-    he: { name: '徐允在', short: '윤재', who: '他' },
-    group: { name: '우리 셋', short: '셋', who: '三人群' },
-    dongmin: { name: '韩东旻', short: '동민', who: '东旻' },
-    friend: { name: '郑书娟', short: '서연', who: '郑书娟' },
-    siwon: { name: '柳时元', short: '🍱', who: '柳时元' },
-    eunji: { name: '宋恩智', short: '은지', who: '宋恩智' },
-    work: { name: '영양팀 업무방', short: '업무', who: '公司工作群' },
-    brother: { name: '지호 (弟弟)', short: '호', who: '弟弟' }
+    he: { name: '徐允在', short: '윤재', who: '他', desc: 'LUMIÈRE 门面兼主唱 · 男朋友' },
+    group: { name: '우리 셋', short: '셋', who: '三人群', desc: '允在、东旻和你' },
+    dongmin: { name: '韩东旻', short: '동민', who: '东旻', desc: 'LUMIÈRE 忙内 · 住允在楼下 · 团里唯一知情的人' },
+    friend: { name: '郑书娟', short: '서연', who: '郑书娟', desc: '大学同学、闺蜜 · 唯一知道你们在交往的人' },
+    siwon: { name: '柳时元', short: '🍱', who: '柳时元', desc: 'LUMIÈRE 主舞' },
+    eunji: { name: '宋恩智', short: '은지', who: '宋恩智', desc: '公司宣传部前辈 · 八卦王' },
+    work: { name: '영양팀 업무방', short: '업무', who: '公司工作群', desc: '营养组工作群 · 室长和宣传部也在' },
+    shop: { name: '밥심 공방 업무방', short: '공방', who: '工坊员工群', desc: '饭力工坊工作群 · 秀珍、叡琳和你' },
+    brother: { name: '지호 (弟弟)', short: '호', who: '弟弟', desc: '亲弟弟 · 在江原道当兵，晚上 6–10 点能用手机' }
   };
 
   function fresh(opts) {
@@ -26,7 +28,7 @@
       flags: { knot1: false, knot2: false, cheat: false },
       lastChoice: 0, outcome: '',
       seen: {},                // 已播放的事件
-      chats: { he: [], group: [], dongmin: [], friend: [], siwon: [], eunji: [], work: [], brother: [] },
+      chats: { he: [], group: [], dongmin: [], friend: [], siwon: [], eunji: [], work: [], shop: [], brother: [] },
       unread: {},
       feeds: {},               // day → feed
       bubbleReplies: [],
@@ -60,7 +62,7 @@
       S.aff = clamp(S.aff + a, 0, 100);
       S.exp = clamp(S.exp + e, 0, 100);
       S.amb = clamp(S.amb + m, 0, 100);
-      if (window.UI && UI.debugRefresh) UI.debugRefresh();
+      if (window.UI && UI.debugRefresh) { UI.debugRefresh(); UI.deskStats(); }
     },
     setFlag(f) { this.S.flags[f] = true; },
 
@@ -107,13 +109,48 @@
     availableChats() {
       const S = this.S, list = ['he'];
       if (S.day >= 12 || S.seen.day12) list.push('group');
-      list.push('dongmin');
-      if (S.role === 'civ') list.push('friend'); else { list.push('work'); list.push('eunji'); }
+      if (S.role === 'civ') { if (!S.chats.shop) S.chats.shop = []; list.push('shop'); list.push('friend'); } else { list.push('work'); list.push('eunji'); }
+      // 东旻第 12 天才加你（员工线在公司见过，但私下没有联系方式）
+      if (S.day >= 12 || S.seen.day12 || (S.chats.dongmin || []).length) list.push('dongmin');
       if (!S.chats.brother) S.chats.brother = [];
       if (S.day >= 20 || S.seen.day20) list.push('brother');
       if (S.amb > 0) list.push('siwon');
       return list;
     },
+
+    // ---- 时间：上班时段、可以跳到的时间点 ----
+    // 素人线：饭力工坊 10–19 点（午市 11–14 最忙），每周一店休；员工线：公司 9–18 点，周末休息
+    isWorkDay() { const w = this.dateOf(this.S.day).getDay(); return this.S.role === 'civ' ? w !== 1 : (w !== 0 && w !== 6); },
+    workHours() { return this.S.role === 'civ' ? [600, 1140] : [540, 1080]; },
+    workStatus() {
+      const S = this.S, m = S.minutes || 510, [a, b] = this.workHours(), civ = S.role === 'civ';
+      if (!this.isWorkDay()) return civ ? '今天店休（每周一），在家' : '周末，公司不上班，在家';
+      if (m < a) return civ ? '还没去店里（10 点开店）' : '还没上班（9 点上班）';
+      if (m < b) return civ ? (m >= 660 && m < 840 ? '在店里上班，午市正忙，回消息很慢' : '在店里上班') : (m >= 720 && m < 780 ? '在公司，午休' : '在公司上班');
+      return m >= 1440 ? '下班了，在家（已经过了零点）' : '下班了，在家';
+    },
+    timeSlots() {
+      const S = this.S;
+      if (!this.isWorkDay()) return [[720, '中午', '睡到自然醒，磨蹭到了中午'], [900, '下午', '下午在家收拾、补觉'], [1140, '傍晚', '天黑了'], [1260, '晚上', ''], [1410, '深夜', ''], [1530, '凌晨', '']];
+      if (S.role === 'civ') return [[600, '去店里', '开店。秀珍已经在备菜了'], [840, '忙完午市', '午市的单子全部送出去了'], [1020, '下午', '下午的配送和明天的备菜'], [1140, '下班', '关店，叡琳把最后一单送走了'], [1260, '晚上', ''], [1410, '深夜', ''], [1530, '凌晨', '']];
+      return [[540, '去公司', '打卡上班'], [780, '午休', '上午的饮食表核对完了'], [1020, '下午', '给团员发明天的菜单'], [1080, '下班', '走出公司大楼'], [1260, '晚上', ''], [1410, '深夜', ''], [1530, '凌晨', '']];
+    },
+    nextSlot() { const m = this.S.minutes || 510; return this.timeSlots().find(x => x[0] > m + 10) || null; },
+    hhmm(min) { return `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`; },
+
+    // ---- 约好的见面 ----
+    addDate(d, nowDay) {
+      const S = this.S; S.dates = S.dates || [];
+      if (!d || typeof d !== 'object') { const t = String(d || '').match(/(\d{1,2})[:：](\d{2})/); d = { time: t ? `${t[1]}:${t[2]}` : '23:30', place: '她家', what: String(d || '') }; }
+      const t = String(d.time || '23:30').match(/(\d{1,2})[:：](\d{2})/) || [0, 23, 30];
+      let min = (+t[1]) * 60 + (+t[2]); if (min < 360) min += 1440;
+      const day = (nowDay || S.day) + (+d.day_offset > 0 ? 1 : 0);
+      if (S.dates.some(x => x.day === day && !x.done)) return null; // 一天只约一次
+      const x = { day, min, time: this.hhmm(min), place: d.place || '她家', what: d.what || '', done: false };
+      S.dates.push(x);
+      return x;
+    },
+    pendingDate() { const S = this.S; return (S.dates || []).find(x => x.day === S.day && !x.done) || null; },
 
     // ---- 存档 ----
     save(slot) {
@@ -127,6 +164,10 @@
       // 旧存档补字段
       const S = this.S;
       if (!S.nameZh) S.nameZh = S.name;
+      // 11/23 第五轮：开局事实换成新版（便当店员工、上班时间）
+      const f0 = (CONFIG.FACTS_START || {})[S.role];
+      if (S.facts && f0 && S.facts[0] && S.facts[0] !== f0 && /^她(在弘大开|是公司签约)/.test(S.facts[0])) S.facts[0] = f0;
+      if (!S.chats.shop) S.chats.shop = [];
       if (!S.facts) {
         const f = (CONFIG.FACTS_START || {})[S.role]; S.facts = f ? [f] : [];
         Object.keys(S.seen || {}).forEach(id => this.addFact(id));
@@ -148,7 +189,7 @@
 
     global() { try { return JSON.parse(localStorage.getItem(GLOBAL_KEY) || '{"endings":{}}'); } catch (e) { return { endings: {} }; } },
     markCG(img) { const g = this.global(); g.cgs = g.cgs || {}; g.cgs[img] = Date.now(); localStorage.setItem(GLOBAL_KEY, JSON.stringify(g)); },
-    markEnding(song) { const g = this.global(); g.endings[song] = Date.now(); localStorage.setItem(GLOBAL_KEY, JSON.stringify(g)); }
+    markEnding(song) { const g = this.global(); g.endings = g.endings || {}; g.endings[song] = Date.now(); localStorage.setItem(GLOBAL_KEY, JSON.stringify(g)); }
   };
 
   window.Game = Game;

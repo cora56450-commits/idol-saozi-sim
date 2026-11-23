@@ -73,8 +73,8 @@
 是否进入他劈腿线：${S.flags.cheat ? '是' : '否'}
 今天的固定事件：${ev ? ev.title : '无'}
 今天他的行程：${SCHEDULE.todayPlan(S.day)}
-现在时间：${UI.clock()}
-一直有效的事（不要和这些矛盾）：
+现在时间：${UI.clock()}；她现在：${Game.workStatus()}
+${S.dates && S.dates.length ? '已经约好的见面：' + S.dates.map(d => `第${d.day}天 ${d.time} ${d.place}（${d.what || ''}）`).join('；') + '\n' : ''}一直有效的事（不要和这些矛盾）：
 ${(S.facts || []).map(f => '- ' + f).join('\n') || '- （无）'}
 最近发生的事：
 ${S.recent.slice(-8).map(r => '- ' + r).join('\n') || '- （刚开始）'}
@@ -82,11 +82,12 @@ ${extra || ''}`;
   }
 
   function transcript(chatId, n) {
-    const msgs = Game.S.chats[chatId].slice(-(n || 16));
+    const msgs = Game.S.chats[chatId].slice(-(n || (chatId === 'he' ? 40 : 20)));
     // 按天分段，让 AI 知道哪些话是哪天说的（避免把三天前的事说成「早上」）
     const today = Game.S.day; let lastDay = null; const out = [];
     msgs.forEach(m => {
       if (m.sep) return;
+      if (m.sys) { out.push(`（系统：${m.sys}）`); return; }
       const d = m.day || null;
       if (d && d !== lastDay) { out.push(d === today ? '—— 今天 ——' : `—— 第 ${d} 天（${today - d} 天前）——`); lastDay = d; }
       const who = m.me ? '玩家' : (m.speaker || Game.CHATS[chatId].who);
@@ -94,6 +95,16 @@ ${extra || ''}`;
       out.push(`${who}：${txt}`);
     });
     return out.join('\n');
+  }
+
+  // 和他以外的人聊天：把提示词里的 {speaker} / {chat_type} 换成这一个聊天
+  function otherSys(chatId) {
+    const c = Game.CHATS[chatId];
+    const type = { group: '三人群（允在、东旻、玩家）', dongmin: '和东旻私聊', friend: '和郑书娟私聊', siwon: '和柳时元私聊',
+      eunji: '和宋恩智私聊', work: '公司工作群', shop: '饭力工坊工作群（白秀珍、吴叡琳和玩家）', brother: '和弟弟지호私聊' }[chatId];
+    const speaker = chatId === 'group' ? '徐允在和韩东旻' : chatId === 'work' ? '朴室长和宣传部同事' : chatId === 'shop' ? '白秀珍和吴叡琳' : c.who;
+    return common() + '\n\n' + PROMPTS.chatOther.replace(/\{speaker\} 和玩家聊天。\{chat_type\} 是 \{[^}]*\}。/, `${speaker} 和玩家聊天。这是${type}。`)
+      + (chatId === 'group' ? STICKER_RULE.replace('表情包：', '表情包（只有允在会发）：') : '');
   }
 
   const STICKER_RULE = `\n\n表情包：type 为 "sticker" 时，ko 字段只能写这些 id 之一：${Object.keys(CONFIG.STICKERS).join(' / ')}（hungry=배고파, manager=실장 미워, bento=도시락!!, hmph=흥, sleepy=졸려, scared=무서워, noona=누나, miss=보고싶다）。不要太频繁，平均三四轮才发一次。`;
@@ -108,12 +119,7 @@ ${extra || ''}`;
         sys = common() + '\n\n' + PROMPTS.chatHe + STICKER_RULE;
         fmt = PROMPTS.chatHeFormat; ex = PROMPTS.chatHeEx;
       } else {
-        const c = Game.CHATS[chatId];
-        const type = { group: '三人群（允在、东旻、玩家）', dongmin: '和东旻私聊', friend: '和郑书娟私聊', siwon: '和柳时元私聊',
-          eunji: '和宋恩智私聊', work: '公司工作群', brother: '和弟弟지호私聊' }[chatId];
-        const speaker = chatId === 'group' ? '徐允在和韩东旻' : (chatId === 'work' ? '朴室长和宣传部同事' : c.who);
-        sys = common() + '\n\n' + PROMPTS.chatOther.replace(/\{speaker\} 和玩家聊天。\{chat_type\} 是 \{[^}]*\}。/, `${speaker} 和玩家聊天。这是${type}。`)
-          + (chatId === 'group' ? STICKER_RULE.replace('表情包：', '表情包（只有允在会发）：') : '');
+        sys = otherSys(chatId);
         fmt = PROMPTS.chatOtherFormat; ex = PROMPTS.chatOtherEx;
       }
       sys += `\n\n输出格式：\n${fmt}\n\n${examples(ex)}`;
@@ -124,7 +130,7 @@ ${extra || ''}`;
 
     // 对方主动发消息（换日后、事件后），playerText 为空
     async chatInitiate(chatId, reason) {
-      const sys = common() + '\n\n' + (chatId === 'he' ? PROMPTS.chatHe + STICKER_RULE : PROMPTS.chatOther) +
+      const sys = (chatId === 'he' ? common() + '\n\n' + PROMPTS.chatHe + STICKER_RULE : otherSys(chatId)) +
         `\n\n这一次是对方主动发消息，玩家没有说话，player_ko 留空，delta 全部为 0。\n输出格式：\n${chatId === 'he' ? PROMPTS.chatHeFormat : PROMPTS.chatOtherFormat}`;
       const user = stateBlock() + `\n【聊天记录（最近）】\n${transcript(chatId) || '（还没有聊过）'}\n\n【为什么主动发】${reason}`;
       return callJSON(sys, user, 1000);
@@ -177,6 +183,23 @@ ${extra || ''}`;
       j.fx = j.fx || {};
       Object.keys(lim).forEach(k => { j.fx[k] = Math.max(-lim[k], Math.min(lim[k], j.fx[k] || 0)); });
       return j;
+    },
+
+    // 线下见面（邀约）：phase = open / talk / close
+    async dateTurn(phase, date, history, playerText) {
+      const sys = common() + '\n\n' + PROMPTS.date + `\n\n输出格式：\n${PROMPTS.dateFormat}`;
+      const user = stateBlock() + `\n【这次见面】${date.place || '她家'}，约的是 ${date.time}（${date.what || ''}）；现在 ${UI.clock()}\n【今天私聊里最近的话】\n${transcript('he', 14) || '（无）'}\n\n【这次见面到目前为止】\n${history || '（刚开始）'}\n\nphase：${phase}` + (playerText ? `\n【玩家这一轮说的话（中文原话）】\n${playerText}` : '');
+      const j = await callJSON(sys, user, 1400);
+      j.fx = j.fx || {};
+      j.fx.aff = Math.max(-3, Math.min(3, +j.fx.aff || 0)); j.fx.exp = Math.max(0, Math.min(2, +j.fx.exp || 0));
+      return j;
+    },
+
+    // 玩家在剧情里的固定台词（中文）→ 她会打出来的韩文（对允在说半语，口语）
+    async translateKo(list) {
+      const sys = `把下面每一句中文翻成韩文。说话的人是 24 岁的韩国女生{player}，在 톡톡 上给比她小一岁的男朋友（或者朋友）发消息：半语、口语、像 2020 年韩国年轻人打字，基本不打句号，保留原话的语气，不要加内容。只输出 JSON：{"ko":["", ...]}，顺序和数量与输入一致。`.replace('{player}', Game.S.name);
+      const j = await callJSON(sys, list.map((z, i) => `${i + 1}. ${z}`).join('\n'), 1200);
+      return Array.isArray(j.ko) ? j.ko : [];
     },
 
     // 第 33 天：判断玩家写的帖子
