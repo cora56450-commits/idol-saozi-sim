@@ -218,7 +218,7 @@
         if (this.mode === 'phone' && Phone.storyChat && (b.t === 'me' || b.who === '他')) cid = Phone.storyChat; // 和画面上的聊天一致（三人群 / 私聊）
         if (!cid) return;
         const m = b.t === 'me' ? { me: true, zh: b.zh, ko: b.ko || this.koOf(b.zh) || undefined } : b.t === 'photo' ? { type: 'photo', note: b.text || '（照片）', speaker: b.who } : { ko: b.ko, zh: b.zh, speaker: b.who, type: b.vtype, note: b.note };
-        m.day = Game.S.day; m.fromEvent = true;
+        m.day = Game.S.day; m.fromEvent = true; m.t = Game.nowMin();
         (Game.S.chats[cid] = Game.S.chats[cid] || []).push(m);
       }
     },

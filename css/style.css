@@ -401,3 +401,6 @@ input, textarea { font-family: inherit; }
 .day-sep.sys { color: var(--red); }
 .choices .date-leave { margin-top: 10px; }
 .ds-date small { display: block; font-size: 12px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.time-sep { align-self: center; text-align: center; margin: 10px 0 2px; font-size: 11px; color: #a39d97; }
+.new-sep { display: flex; align-items: center; gap: 10px; margin: 12px 14px 4px; font-size: 11px; color: var(--red); }
+.new-sep::before, .new-sep::after { content: ''; flex: 1; height: 1px; background: rgba(142, 27, 42, .35); }

@@ -93,7 +93,11 @@
       $$('[data-back]', scr()).forEach(b => b.onclick = () => this.go(b.dataset.back));
       this.bind(view, arg);
       const body = $('.app-body', scr());
-      if (body && (view === 'chat' || view === 'blink' || (view === 'insta' && arg === 'group'))) body.scrollTop = body.scrollHeight;
+      if (body && (view === 'chat' || view === 'blink' || (view === 'insta' && arg === 'group'))) {
+        body.scrollTop = body.scrollHeight;
+        const ns = view === 'chat' && $('#new-sep', scr()); // 有新消息：停在「以下是新消息」那里
+        if (ns && body.scrollHeight - ns.offsetTop > body.clientHeight) body.scrollTop = ns.offsetTop - 10;
+      }
       if (view === 'chat') { S.unread[arg] = 0; }
       if (view === 'blink') S.unread.blink = 0;
       if (view === 'pan') S.unread.pan = 0;
@@ -158,11 +162,16 @@
 
     chatView(id) {
       const S = Game.S, c = Game.CHATS[id];
-      let lastDay = 0, out = '';
-      for (const m of S.chats[id]) {
-        if (m.day && m.day !== lastDay) { out += this.msgHTML({ sep: Game.dateStr(m.day) }, id); lastDay = m.day; }
+      let lastDay = 0, lastT = null, out = '';
+      const list = S.chats[id], unread = S.unread[id] || 0, newFrom = unread ? list.length - unread : -1;
+      list.forEach((m, k) => {
+        if (m.day && m.day !== lastDay) { out += this.msgHTML({ sep: Game.dateStr(m.day) }, id); lastDay = m.day; lastT = null; }
+        if (k === newFrom && k > 0) out += `<div class="new-sep" id="new-sep"><span>以下是新消息</span></div>`;
+        // 隔了 15 分钟以上（或者是这一天第一条）就标一下时间
+        if (m.t != null && (lastT == null || m.t - lastT >= 15)) out += `<div class="time-sep">${Game.hhmm(m.t)}</div>`;
+        if (m.t != null) lastT = m.t;
         out += this.msgHTML(m, id);
-      }
+      });
       out = `<div class="chat-intro">${esc(c.desc || '')}</div>` + (out || `<div class="empty-tip">还没有消息</div>`);
       return `<div class="app toktok">${statusBar(true)}${head(c.name, '', 'toktok')}<div class="app-body"><div class="msgs" id="msgs">${out}</div></div>
         <div class="app-foot"><textarea id="chat-in" placeholder="打中文，发出去会变成韩文"></textarea><button class="send" id="chat-send"><img src="assets/ui/ic_send.png" alt=""></button></div></div>`;
@@ -171,7 +180,7 @@
     async sendChat(id, text) {
       const S = Game.S;
       if (this.busy) return;
-      const me = { me: true, zh: text, day: S.day };
+      const me = { me: true, zh: text, day: S.day, t: Game.nowMin() };
       S.chats[id].push(me);
       this.go('chat', id);
       UI.tick(3);
@@ -205,7 +214,7 @@
         this.go('chat', id);
         for (const r of (j.replies || [])) {
           await sleep(700 + Math.random() * 1200);
-          const m = { day: S.day, speaker: r.speaker || (id === 'he' ? '他' : Game.CHATS[id].who) };
+          const m = { day: S.day, t: Game.nowMin(), speaker: r.speaker || (id === 'he' ? '他' : Game.CHATS[id].who) };
           if (r.type === 'sticker') { m.type = 'sticker'; m.sticker = r.ko; }
           else if (r.type === 'photo') { m.type = 'photo'; m.note = r.note || r.zh; }
           else if (r.type === 'voice') { m.type = 'voice'; m.ko = r.ko; m.zh = r.zh; m.note = r.note; }
@@ -227,7 +236,7 @@
     pushIncoming(id, replies) {
       const S = Game.S;
       for (const r of replies) {
-        const m = { day: S.day, speaker: r.speaker || (id === 'he' ? '他' : Game.CHATS[id].who) };
+        const m = { day: S.day, t: Game.nowMin(), speaker: r.speaker || (id === 'he' ? '他' : Game.CHATS[id].who) };
         if (r.type === 'sticker') { m.type = 'sticker'; m.sticker = r.ko; }
         else if (r.type === 'photo') { m.type = 'photo'; m.note = r.note || r.zh; }
         else { m.ko = r.ko; m.zh = r.zh; m.note = r.note; if (r.type === 'voice') m.type = 'voice'; }

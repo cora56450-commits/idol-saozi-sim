@@ -136,6 +136,8 @@
       return [[540, '去公司', '打卡上班'], [780, '午休', '上午的饮食表核对完了'], [1020, '下午', '给团员发明天的菜单'], [1080, '下班', '走出公司大楼'], [1260, '晚上', ''], [1410, '深夜', ''], [1530, '凌晨', '']];
     },
     nextSlot() { const m = this.S.minutes || 510; return this.timeSlots().find(x => x[0] > m + 10) || null; },
+    // 现在几点（分钟）：剧情里按剧情时间，平时按桌面时间
+    nowMin() { return (window.Story && Story.ev && Story.storyMin != null) ? (Story.storyMin < 360 ? Story.storyMin + 1440 : Story.storyMin) : (this.S.minutes || 510); },
     hhmm(min) { return `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`; },
 
     // ---- 约好的见面 ----

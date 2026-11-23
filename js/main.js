@@ -352,8 +352,8 @@
         d.done = true; Game.remember(`约好 ${d.time} 和${nm}见面，她没去，放了鸽子`);
         if (isHe) {
           Game.applyFx({ aff: -3 }, 'event');
-          S.chats.he.push({ day: S.day, speaker: '他', ko: '누나 자?', zh: '姐姐睡了？' }, { day: S.day, speaker: '他', ko: '…문 앞까지 왔는데', zh: '……我都到门口了' });
-        } else if (d.who === '郑书娟') S.chats.friend.push({ day: S.day, speaker: '郑书娟', ko: '야 어디야??', zh: '喂 你人呢？？' }, { day: S.day, speaker: '郑书娟', ko: '나 혼자 고기 굽고 있다 진짜', zh: '我一个人在这烤肉 真的' });
+          S.chats.he.push({ day: S.day, t: Game.nowMin(), speaker: '他', ko: '누나 자?', zh: '姐姐睡了？' }, { day: S.day, t: Game.nowMin(), speaker: '他', ko: '…문 앞까지 왔는데', zh: '……我都到门口了' });
+        } else if (d.who === '郑书娟') S.chats.friend.push({ day: S.day, t: Game.nowMin(), speaker: '郑书娟', ko: '야 어디야??', zh: '喂 你人呢？？' }, { day: S.day, t: Game.nowMin(), speaker: '郑书娟', ko: '나 혼자 고기 굽고 있다 진짜', zh: '我一个人在这烤肉 真的' });
         UI.deskStats();
         return this.endDay();
       }
@@ -371,7 +371,7 @@
       }
       // 第 3 天约好了周五自由餐：每周四晚上十一点他准时发来「明天是周五了」
       if ((S.picks || {}).day3 === 2 && Game.dateOf(S.day).getDay() === 4) {
-        S.chats.he.push({ day: S.day, speaker: '他', ko: '내일 금요일이다', zh: '明天是周五了' });
+        S.chats.he.push({ day: S.day, t: Game.nowMin(), speaker: '他', ko: '내일 금요일이다', zh: '明天是周五了' });
         UI.notify('toktok', '徐允在', '내일 금요일이다', () => {});
         await new Promise(r => setTimeout(r, 1600));
       }
