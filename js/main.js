@@ -229,12 +229,15 @@
       const S = Game.S, h = Math.floor((S.minutes % 1440) / 60), now = UI.clock(), st = Game.workStatus();
       const working = /上班/.test(st), list = Game.availableChats();
       const pool = [];
-      const add = (id, w, why) => { if (list.includes(id)) pool.push({ id, w, why }); };
+      // 每个人一天主动找你的次数有上限（书娟一天最多两次）
+      const cnt = (S.ambientCount && S.ambientCount.day === day) ? S.ambientCount : (S.ambientCount = { day });
+      const add = (id, w, why) => { if (list.includes(id) && (cnt[id] || 0) < (this.AMBIENT_MAX[id] || 1)) pool.push({ id, w, why }); };
+      const topic = (arr) => arr[Math.floor(Math.random() * arr.length)];
       if (S.role === 'civ') {
         add('shop', /去店里/.test(nx[1]) ? 6 : working ? 3 : 0.5, working
           ? `现在 ${now}，店里营业中。白秀珍或吴叡琳在工作群里说店里的事：订单、备菜、食材不够、配送跑到哪、客人的奇怪要求、叡琳上课迟到之类。`
           : `现在 ${now}，店已经关了。白秀珍或吴叡琳在工作群里随口说点下班后的事，或者提醒明天的订单。`);
-        add('friend', 3, `现在 ${now}（她：${st}）。闺蜜郑书娟主动找她闲聊：吐槽自己公司和上司、分享八卦或好笑的事、约周末、追问她和允在最近怎么样。要像真闺蜜，不用每次都绕到恋爱上。`);
+        add('friend', 1.5, `现在 ${now}（她：${st}）。闺蜜郑书娟主动找她，这次聊的是：${topic(this.FRIEND_TOPICS)}。书娟早就知道她在和允在交往，不要问"有什么好事""是不是恋爱了""最近气色好"这种话；也不要重复聊天记录里已经聊过的话题。`);
       } else {
         add('work', working ? 4 : 0.5, `现在 ${now}。公司工作群里室长或宣传部发公事：明天行程变动、团员饮食问题、会议时间、偶尔有人发错消息。`);
         add('eunji', working ? 3 : 1, `现在 ${now}（她：${st}）。宋恩智主动来八卦：茶水间听到的艺人传闻、约下午茶、打听她最近在忙什么。`);
@@ -244,9 +247,20 @@
       if (h >= 18 && h < 22) add('brother', 2.5, `现在 ${now}，他刚从部队拿到手机。主动找姐姐聊：吐槽部队伙食、班长、站岗，或者跟她要东西。`);
       if (S.amb >= 20) add('siwon', h >= 22 || h < 3 ? 2 : 0.5, `现在 ${now}。柳时元很克制地主动发一两句消息（练习结束、看到某样东西想起她）。`);
       const pick = () => { const tot = pool.reduce((a, x) => a + x.w, 0); let r = Math.random() * tot; for (let k = 0; k < pool.length; k++) { r -= pool[k].w; if (r <= 0) return pool.splice(k, 1)[0]; } return null; };
-      const n = Math.random() < 0.35 ? 2 : 1; // 一次一两个人
-      for (let k = 0; k < n && pool.length; k++) { const x = pick(); if (x && x.w > 0) setTimeout(() => this.ping(x.id, x.why, day), 1500 + k * 4000); }
+      const n = Math.random() < 0.25 ? 2 : 1; // 一次一两个人
+      for (let k = 0; k < n && pool.length; k++) { const x = pick(); if (x && x.w > 0) { cnt[x.id] = (cnt[x.id] || 0) + 1; setTimeout(() => this.ping(x.id, x.why, day), 1500 + k * 4000); } }
     },
+    AMBIENT_MAX: { friend: 2, shop: 3, work: 2, eunji: 2, group: 2, dongmin: 1, brother: 1, siwon: 1 },
+    FRIEND_TOPICS: [
+      '吐槽她自己公司的上司或同事（具体发生了什么）',
+      '分享一个八卦、或者刚刷到的好笑的东西',
+      '约这周末出去（说清楚去哪：烤肉、逛街、咖啡店、KTV……）',
+      '她自己家里的事，或者被妈妈催相亲',
+      '下班累死了，求安慰、求一起吃宵夜',
+      '推荐一部最近在追的剧或者一家店',
+      '看到论坛 / 新闻里允在的消息，来问她允在最近怎么样、你们有没有吵架',
+      '她自己的感情：暧昧对象、前任、相亲对象'
+    ],
     async ping(id, reason, day) {
       try {
         const S = Game.S, j = await API.chatInitiate(id, reason);
