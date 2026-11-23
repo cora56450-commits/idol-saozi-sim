@@ -133,7 +133,7 @@
     },
 
     async genFeed() {
-      const S = Game.S;
+      const S = Game.S, day = S.day; // 记下是哪一天的：加载途中玩家可能已经结束这一天
       let f;
       if (Game.settings().apiKey) {
         UI.loading(true, '大家在刷手机…');
@@ -141,7 +141,9 @@
         UI.loading(false);
       }
       if (!f) f = Phone.offlineFeed();
-      S.feeds[S.day] = f;
+      if (Game.S !== S) return; // 中途读档 / 开新游戏
+      S.feeds[day] = f;
+      if (S.day !== day) { Game.autosave(); return; } // 已经过了这一天：只存档，不再弹提醒、不再算曝光
       // 只留最近 5 天，避免存档太大
       Object.keys(S.feeds).forEach(d => { if (+d < S.day - 4) delete S.feeds[d]; });
       S.unread.blink = S.sub ? (f.bubble || []).length : 0;
@@ -158,7 +160,9 @@
 
     async morningPing() {
       try {
-        const j = await API.chatInitiate('he', `新的一天（${SCHEDULE.todayPlan(Game.S.day)}），他在出门前或休息间隙主动找你。`);
+        const S = Game.S, day = S.day;
+        const j = await API.chatInitiate('he', `新的一天（${SCHEDULE.todayPlan(day)}），他在出门前或休息间隙主动找你。`);
+        if (Game.S !== S || S.day !== day) return; // 已经过了这一天，早安消息作废
         if (j.replies && j.replies.length) Phone.pushIncoming('he', j.replies);
       } catch (e) { console.warn(e); }
     },
@@ -167,6 +171,22 @@
       const S = Game.S;
       const ok = await UI.confirm(`结束第 ${S.day} 天？`, '吃完便当，睡觉', '再玩会儿');
       if (!ok) return;
+      // 白天发给弟弟的消息：晚上六点他拿到手机，一起回
+      if (S.brotherPending && Game.settings().apiKey) {
+        S.brotherPending = false;
+        try {
+          UI.loading(true, '지호 拿到手机了');
+          const j = await API.chatInitiate('brother', '现在是晚上六点零几分，他刚从部队拿到手机，看到姐姐白天发的消息，一起回复她（只回应她白天说的话）。');
+          UI.loading(false);
+          if (j.replies && j.replies.length) { Phone.pushIncoming('brother', j.replies); await new Promise(r => setTimeout(r, 1800)); }
+        } catch (e) { UI.loading(false); console.warn(e); }
+      }
+      // 第 3 天约好了周五自由餐：每周四晚上十一点他准时发来「明天是周五了」
+      if ((S.picks || {}).day3 === 2 && Game.dateOf(S.day).getDay() === 4) {
+        S.chats.he.push({ day: S.day, speaker: '他', ko: '내일 금요일이다', zh: '明天是周五了' });
+        UI.notify('toktok', '徐允在', '내일 금요일이다', () => {});
+        await new Promise(r => setTimeout(r, 1600));
+      }
       S.day += 1;
       if (S.day % 7 === 1) Game.applyFx({ exp: -3 }, 'event'); // 曝光自然回落：一周 −3
       S.unread.blink = 0; S.unread.pan = 0; S.unread.insta = 0;

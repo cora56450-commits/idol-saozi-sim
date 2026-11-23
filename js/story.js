@@ -36,6 +36,14 @@
       this.ev = null; this.storyMin = null;
     },
 
+    // 文案里的〔素人：A｜员工：B〕按身份换成对应的那段
+    roleText(b) {
+      const re = /〔素人：([^｜〕]*)｜员工：([^〕]*)〕/g;
+      if (!/〔素人：/.test((b.text || '') + (b.zh || '') + (b.ko || ''))) return b;
+      const pick = (s) => s && s.replace(re, (m, a, c) => Game.S.role === 'civ' ? a : c);
+      return Object.assign({}, b, { text: pick(b.text), zh: pick(b.zh), ko: pick(b.ko) });
+    },
+
     // 旁白里的时间（「凌晨一点四十」「中午十二点零三分」）→ 剧情里手机状态栏的时间
     parseTime(txt) {
       const cn = s => { if (/^\d+$/.test(s)) return +s; const D = { 零: 0, 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
@@ -144,8 +152,9 @@
     },
 
     async run(blocks) {
-      for (const b of blocks) {
+      for (let b of blocks) {
         if (!Game.check(b.if)) continue;
+        b = this.roleText(b);
         await this.cgByMatch(b);
         if (b.t === 'nar' || b.t === 'section') this.setStoryTime(b.text);
         switch (b.t) {
@@ -227,6 +236,7 @@
       }
       const o = opts[idx];
       S.lastChoice = idx + 1;
+      S.picks = S.picks || {}; if (S.picks[this.ev.id] == null) S.picks[this.ev.id] = idx + 1; // 每个事件记第一个选择，后面的剧情可以按它分支
       Game.addFact(`${this.ev.id}#${idx + 1}`);
       Game.applyFx(o.fx, 'event');
       (o.flags || []).forEach(f => Game.setFlag(f));
@@ -237,6 +247,10 @@
       const cgc = CONFIG.EVENT_CG.find(c => c.ev === this.ev.id && c.choice === idx + 1 && (!c.role || c.role === S.role));
       if (cgc) await this.showCG(cgc.img);
 
+      // 选项里带着引号的话（「听了，高音很好。」）= 你说出口的话，先显示出来
+      const q = (o.label.match(/「([^」]+)」?/) || [])[1];
+      const first = (o.after || []).find(x => Game.check(x.if));
+      if (q && !/写/.test(o.label) && !(first && first.t === 'me')) { const mb = { t: 'me', zh: q, ch: this.mode === 'phone' ? undefined : 'chat' }; this.show(mb); this.logLine(mb); await this.wait(); }
       await this.run(o.after);
     },
 
@@ -300,6 +314,8 @@
     // ---- 自由聊天（序章、第 40 天）----
     async freeChat(b) {
       const S = Game.S;
+      // 说明现在是在和他私聊（前一句可能是粉丝群在说话，免得玩家回错地方）
+      if (this.mode === 'phone' && !/教学/.test(b.text)) this.section('和他的私聊 · 自由聊天');
       const text = await Phone.storyInput(b.text.includes('教学') ? '在这里打字就能和他聊天（打中文）' : '和他聊聊（打中文）', this.mode === 'gal');
       if (!text) return;
       this.show({ t: 'me', zh: text }); this.logLine({ t: 'me', zh: text });
@@ -331,6 +347,12 @@
         const j = await API.judgePost(r.title, r.body);
         S.outcome = /翻车/.test(j.result) ? '翻车' : '成功';
         Game.remember(`用小号发了帖子「${r.title}」，结果${S.outcome}`);
+        UI.loading(false);
+        // 先让玩家看到自己发出去的帖子（翻成韩文的样子）
+        const post = [{ t: 'section', text: '你的帖子' },
+          { t: 'say', who: '论坛', ko: j.title_ko || r.title, zh: r.title, manner: '标题' },
+          { t: 'say', who: '论坛', ko: j.body_ko || r.body, zh: r.body }];
+        await this.run(post);
       } catch (e) { S.outcome = '成功'; }
       UI.loading(false);
     }

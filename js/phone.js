@@ -178,6 +178,15 @@
         S.chats[id].push({ ko: '（还没有设置 API）', zh: '去桌上的专辑 → 设置，填好 API Key 就能聊天了', speaker: Game.CHATS[id].who === '三人群' ? '他' : Game.CHATS[id].who, day: S.day });
         this.go('chat', id); return;
       }
+      // 弟弟在部队，只有晚上六点到十点能用手机：其他时间发的消息先放着，晚上他一起回
+      if (id === 'brother') {
+        const h = Math.floor((S.minutes || 600) / 60) % 24;
+        if (h < 18 || h >= 22) {
+          S.brotherPending = true;
+          if (!S.brotherNoted) { S.brotherNoted = true; await sleep(300); UI.tip('brother'); }
+          return;
+        }
+      }
       this.busy = true;
       const box = $('#msgs');
       box.insertAdjacentHTML('beforeend', `<div class="typing" id="typing">입력 중…</div>`);

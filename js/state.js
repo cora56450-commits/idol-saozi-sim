@@ -98,7 +98,7 @@
       if (!cond) return true;
       const S = this.S;
       const env = { role: S.role, aff: S.aff, exp: S.exp, amb: S.amb, knot1: S.flags.knot1, knot2: S.flags.knot2,
-        cheat: S.flags.cheat, lastChoice: S.lastChoice, outcome: S.outcome, sub: !!S.sub, day: S.day };
+        cheat: S.flags.cheat, lastChoice: S.lastChoice, outcome: S.outcome, sub: !!S.sub, day: S.day, pick: S.picks || {} };
       try { return !!Function(...Object.keys(env), 'return (' + cond + ');')(...Object.values(env)); }
       catch (e) { console.warn('条件出错', cond, e); return true; }
     },

@@ -27,6 +27,12 @@ def parse_fx(t):
     return fx, flags
 
 def header_cond(h):
+    pm = re.search(r'第\s*(\d+)\s*天(没)?选了?\s*(\d)', h)
+    if pm:
+        c = 'pick.day%s%s%s' % (pm.group(1), '!=' if pm.group(2) else '==', pm.group(3))
+        if '素人线' in h: c = "role=='civ' && " + c
+        if '员工线' in h: c = "role=='staff' && " + c
+        return c
     if '没订阅泡泡' in h: return '!sub'
     if '订阅了泡泡' in h: return 'sub'
     if '元旦结算时' in h: return 'day>=90'
@@ -63,6 +69,11 @@ def speaker_line(text, default_who, channel):
             return {'t': 'me', 'zh': rest.strip('「」')}
         if rest.startswith('[照片]'):
             return {'t': 'photo', 'who': who, 'text': rest[4:].strip()}
+        # 只有符号 / 语气的消息（「!!!!!!」「ㅋㅋㅋ」「……」），不需要翻译
+        if re.fullmatch(r'[!?！？.。…~～ㅋㅎㅠㅜ\s]+', rest) and who in ('他','东旻','柳时元','郑书娟','宋恩智','弟弟'):
+            b = {'t': 'say', 'who': who, 'ko': rest, 'zh': ''}
+            if channel: b['ch'] = channel
+            return b
         if HANGUL.search(rest) or (split_ko_zh(rest)[1] and who in ('他','东旻','柳时元','室长','郑书娟','宋恩智','弟弟')):
             ko, zh = split_ko_zh(rest)
             if not zh:
@@ -89,7 +100,7 @@ events = {}; order = []
 cur = None; part = None
 cond = None; choice = None; opt = None
 section_who = None; section_ch = None
-rolecond = None; in_flash = False
+rolecond = None; in_flash = False; last_cond = None
 mode_root = None  # 'prologue' / 'events' / 'endings' / 'after'
 
 def new_event(eid, title, day, mode, kind="event"):
@@ -170,7 +181,9 @@ for raw in lines:
             choice = {'t': 'choice', 'options': []}
             if c: choice['if'] = c
             add(choice); continue
-        cond = header_cond(h)
+        if h.strip() == '否则':
+            cond = '!(%s)' % last_cond if last_cond else None; continue
+        cond = header_cond(h); last_cond = cond
         if h.startswith('结尾') or h.startswith('共同') or h.startswith('东旻的正事'):
             if not header_cond(h): cond = None
         continue
@@ -191,7 +204,8 @@ for raw in lines:
         if fxm:
             fx, flags = parse_fx(fxm.group(1)); tail = fxm.group(2)
             label = label[:fxm.start()].strip()
-        label = label.strip().strip('「」')
+        label = label.strip()
+        if label.startswith('「') and label.endswith('」') and label.count('「') == 1: label = label[1:-1]
         opt = {'label': label, 'fx': fx, 'flags': flags, 'after': []}
         if tail: opt['after'].append({'t': 'nar', 'text': tail})
         choice['options'].append(opt); continue
@@ -233,6 +247,19 @@ for raw in lines:
     if s.startswith('注：') or s.startswith('注:') or s.startswith('自由输入注意'):
         add({'t': 'note', 'text': s}); continue
     if s.startswith('→') or '自由聊天' in s or '自由回复' in s:
+        fc = re.match(r'^(之后自由聊天[^。]*。)(.+)$', s)
+        if fc and '自由聊天' not in fc.group(2) and '选项' not in fc.group(2):
+            # 「之后自由聊天。凌晨一点，他发来最后一条：……」后半句是剧情，不能吞掉
+            add({'t': 'freechat', 'text': fc.group(1)})
+            rest = fc.group(2).strip()
+            sm = re.match(r'^(.*?他发来最后一条)[：:](.+)$', rest)
+            if sm:
+                add({'t': 'nar', 'text': sm.group(1) + '：'})
+                ko, zh = split_ko_zh(sm.group(2).rstrip('。'))
+                add({'t': 'say', 'who': '他', 'ko': ko, 'zh': zh, 'ch': 'chat'} if zh else {'t': 'nar', 'text': sm.group(2)})
+            else:
+                add({'t': 'nar', 'text': rest})
+            continue
         add({'t': 'freechat', 'text': s.lstrip('→ ').strip()}); continue
     if s.startswith('**玩家自由写'):
         add({'t': 'freepost', 'text': re.sub(r'\*\*', '', s)}); continue
@@ -255,7 +282,7 @@ def clean(bs):
 for e in events.values(): clean(e['blocks'])
 # 线下事件里：旁白说到「手机亮了 / 发来」之后的台词是手机消息（不显示立绘），说到「推门进来 / 站在面前」之后又回到面对面
 PHONE_ON = re.compile(r'手机(亮|震|响)|发来|发了一|来了一条|又来一条|来消息|消息|已读|回了一|私聊|打字|语音|视频通话|电话')
-PHONE_OFF = re.compile(r'猫眼|门外|敲门|门口|楼梯|他说[：:]|推开|推门|走进|进来|进门|开门|站在|坐在|面前|身边|身后|旁边|对面|抬头|车里|车上|走过来|走廊|后台|见到|看到他|他来了|拉住|握住|抱住')
+PHONE_OFF = re.compile(r'回信|写信|信纸|信封|猫眼|门外|敲门|门口|楼梯|他说[：:]|推开|推门|走进|进来|进门|开门|站在|坐在|面前|身边|身后|旁边|对面|抬头|车里|车上|走过来|走廊|后台|见到|看到他|他来了|拉住|握住|抱住')
 def mark_phone(bs, on):
     for b in bs:
         if b['t'] == 'nar':
@@ -273,6 +300,25 @@ def mark_phone(bs, on):
     return on
 for e in events.values():
     if e['mode'] == 'gal': mark_phone(e['blocks'], False)
+
+# 「下一条隔了很久才来：고마워 누나（谢谢姐姐）」这类旁白里夹着他的一条消息 → 拆成旁白 + 他的消息
+INLINE = re.compile(r'^(.{0,40}?(?:他(?:又)?(?:发|回)(?:来|了)?(?:一条|一句|最后一条)?|下一条[^：:]*))[：:]\s*([^（）]*[가-힣][^（）]*)（([^（）]+)）[。.]?$')
+def split_inline(bs):
+    out = []
+    for b in bs:
+        if b['t'] == 'choice':
+            for o in b['options']: o['after'] = split_inline(o.get('after', []))
+        m = INLINE.match(b.get('text', '')) if b['t'] == 'nar' else None
+        if m:
+            n = {'t': 'nar', 'text': m.group(1) + '：'}
+            s = {'t': 'say', 'who': '他', 'ko': m.group(2).strip(), 'zh': m.group(3).strip(), 'ch': 'chat'}
+            if b.get('if'): n['if'] = s['if'] = b['if']
+            out += [n, s]
+        else:
+            out.append(b)
+    return out
+for e in events.values():
+    e['blocks'] = split_inline(e['blocks'])
 
 open(OUT, 'w', encoding='utf-8').write(
     '// 由 tools/parse_events.py 从「固定文案.md」自动生成，不要手改；改文案请改 md 后重新运行\n'
