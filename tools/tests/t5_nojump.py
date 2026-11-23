@@ -13,7 +13,7 @@ async def main():
         await pg.route('https://fake.api/**', h)
         await pg.goto('file:///home/claude/proj/game/index.html'); await pg.wait_for_timeout(300)
         await pg.evaluate("localStorage.setItem('idolsao_settings', JSON.stringify({provider:'openai',baseUrl:'https://fake.api/v1',apiKey:'k',model:'m'})); localStorage.setItem('idolsao_global', JSON.stringify({endings:{},tips:{gal:1,phoneStory:1,choice:1,home:1,chat:1,blink:1,pan:1,insta:1,desk:1}}))")
-        await pg.evaluate("Game.newGame({role:'civ'}); Game.S.day=5; Game.S.seen.day3=true; UI.show('scr-desk'); UI.renderDesk(); Game.S.minutes=1400; Phone.open('home'); Phone.go('chat','friend')")
+        await pg.evaluate("Game.newGame({role:'civ'}); Game.S.day=5; Game.S.seen.day3=true; UI.show('scr-desk'); UI.renderDesk(); Game.S.minutes=1400; Phone.isBusy=()=>false; Phone.open('home'); Phone.go('chat','friend')")
         await pg.fill('#chat-in','周六见'); await pg.click('#chat-send'); await pg.wait_for_timeout(200)
         await pg.evaluate("Phone.go('toktok'); Phone.go('chat','shop')")
         await pg.fill('#chat-in','今天订单多吗'); await pg.click('#chat-send'); await pg.wait_for_timeout(300)

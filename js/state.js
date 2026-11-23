@@ -189,6 +189,8 @@
       const f0 = (CONFIG.FACTS_START || {})[S.role];
       if (S.facts && f0 && S.facts[0] && S.facts[0] !== f0 && /^她(在弘大开|是公司签约)/.test(S.facts[0])) S.facts[0] = f0;
       if (!S.chats.shop) S.chats.shop = [];
+      // 配图规则改过：读档时让 InstaSnap 动态重新挑图
+      Object.values(S.feeds || {}).forEach(f => (f.instasnap || []).forEach(p => { delete p._img; }));
       if (!S.facts) {
         const f = (CONFIG.FACTS_START || {})[S.role]; S.facts = f ? [f] : [];
         Object.keys(S.seen || {}).forEach(id => this.addFact(id));

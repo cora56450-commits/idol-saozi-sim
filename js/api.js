@@ -124,7 +124,7 @@ ${extra || ''}`;
         fmt = PROMPTS.chatOtherFormat; ex = PROMPTS.chatOtherEx;
       }
       sys += `\n\n输出格式：\n${fmt}\n\n${examples(ex)}`;
-      const user = stateBlock() + `\n【聊天记录（最近）】\n${transcript(chatId) || '（还没有聊过）'}\n\n【玩家刚发来的话（中文原话）】\n${playerText}`
+      const user = stateBlock() + `\n【聊天记录（最近）】\n${transcript(chatId) || '（还没有聊过）'}\n\n【玩家刚发来的话（中文原话）】\n${playerText}\n\n【约见面检查】如果聊天记录里已经有人提出了具体的时间和地点，而玩家这句是答应（好 / 行 / 可以 / OK / 去 / 见），这一轮就算约好了，必须在 flags 写 "date_promised" 并填好 date（day_offset、time、place、what）。`
         + (storyCtx ? `\n\n【这段聊天发生在固定剧情中间。你的回复之后剧情会这样接下去，不要和它矛盾，也不要提前说出后面的内容，只回应玩家这一句，3～5 条以内】\n${storyCtx}` : '');
       return callJSON(sys, user, 1500);
     },
@@ -184,6 +184,13 @@ ${extra || ''}`;
       j.fx = j.fx || {};
       Object.keys(lim).forEach(k => { j.fx[k] = Math.max(-lim[k], Math.min(lim[k], j.fx[k] || 0)); });
       return j;
+    },
+
+    // 兜底：AI 没标约好，但看起来像答应了 → 单独问一次「这段聊天里是不是约好了见面」
+    async extractDate(chatId) {
+      const sys = `你在读一段 톡톡 聊天记录，判断玩家和对方是不是已经约好了一次具体的线下见面（时间和地点都说定了，玩家也答应了）。只是随口说"改天见"不算。今天是 ${Game.dateStr(Game.S.day)}，现在 ${UI.clock()}。只输出 JSON：{"agreed": true/false, "day_offset": 0, "time": "18:00", "place": "", "what": ""}。day_offset 是从今天算第几天（0 = 今天，周六就算到周六，最多 7）；time 用 24 小时制。`;
+      const j = await callJSON(sys, transcript(chatId, 14) || '（无）', 300);
+      return j && j.agreed ? j : null;
     },
 
     // 线下见面（邀约）：phase = open / talk / close

@@ -225,7 +225,7 @@
         if (j.player_ko) me.ko = j.player_ko;
         this.lastReply[id] = Game.nowMin();
         Game.applyFx(j.delta, 'chat');
-        this.takeDate(id, j);
+        if (!this.takeDate(id, j)) this.maybeDate(id, text);
         this.refreshChat(id);
         for (const r of (j.replies || [])) {
           await sleep(700 + Math.random() * 1200);
@@ -251,10 +251,26 @@
     // 聊天里约好了见面 → 排进日程
     takeDate(id, j) {
       const S = Game.S;
-      if (!(j.flags && j.flags.includes('date_promised') && j.date && (typeof j.date === 'string' || Object.keys(j.date).length))) return;
+      if (!(j.flags && j.flags.includes('date_promised') && j.date && (typeof j.date === 'string' || Object.keys(j.date).length))) return false;
+      return this.addDateFor(id, j.date);
+    },
+    addDateFor(id, date) {
+      const S = Game.S;
       const who = { he: '他', group: '他', friend: '郑书娟', dongmin: '东旻', siwon: '柳时元', eunji: '宋恩智', shop: '白秀珍' }[id];
-      const d = who && Game.addDate(j.date, S.day, who);
-      if (d) { const w = Game.dayWord(d.day); Game.remember(`和${Game.whoName(who)}约好了：${w} ${d.time} ${d.place}（${d.what}）`); S.chats[id].push({ sys: `约好了 · ${w} ${d.time} · ${d.place}`, day: S.day, t: Game.nowMin() }); UI.deskStats(); }
+      const d = who && Game.addDate(date, S.day, who);
+      if (d) { const w = Game.dayWord(d.day); Game.remember(`和${Game.whoName(who)}约好了：${w} ${d.time} ${d.place}（${d.what}）`); S.chats[id].push({ sys: `约好了 · ${w} ${d.time} · ${d.place}`, day: S.day, t: Game.nowMin() }); UI.deskStats(); this.refreshChat(id); }
+      return !!d;
+    },
+    // AI 没标约好：玩家这句像在答应、聊天里又提到了哪天几点，就再确认一次
+    async maybeDate(id, text) {
+      if (!{ he: 1, group: 1, friend: 1, dongmin: 1, siwon: 1, eunji: 1, shop: 1 }[id]) return;
+      if (!/好|行|可以|ok|OK|去|见|约|没问题|定了|就这么|那就|ㅇㅋ|좋아/.test(text)) return;
+      const recent = Game.S.chats[id].slice(-8).map(m => (m.zh || '') + (m.ko || '')).join(' ') + text;
+      if (!/周[一二三四五六日天末]|礼拜|星期|明天|后天|今晚|今天晚上|晚上|中午|下午|\d+\s*[点:：]|[一二三四五六七八九十]+点|토요일|일요일|금요일|내일|저녁|시/.test(recent)) return;
+      try {
+        const j = await API.extractDate(id === 'group' ? 'group' : id);
+        if (j && j.time) this.addDateFor(id, j);
+      } catch (e) { console.warn(e); }
     },
 
     // 回复到了：正在看这个聊天就原地刷新（保留没发出去的草稿）；在看别的地方就只亮未读，不跳过去
@@ -330,7 +346,7 @@
           Game.applyFx(j.delta, 'chat');
           const reps = (j.replies || []).map(r => Object.assign({}, r));
           if (reps.length) this.pushIncoming(id, reps, at);
-          this.takeDate(id, j);
+          if (!this.takeDate(id, j)) this.maybeDate(id, mine.map(m => m.zh).join(' '));
           this.lastReply[id] = at;
           if (this.view === 'chat' && this.arg === id) { S.unread[id] = 0; this.go('chat', id); }
         } catch (e) { console.warn(e); P[id] = p; }

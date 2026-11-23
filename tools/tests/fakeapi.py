@@ -1,7 +1,9 @@
 import json, re
 def reply(body):
     d = json.loads(body); sys = d['messages'][0]['content']; user = d['messages'][1]['content']
-    if '把下面每一句中文翻成韩文' in sys:
+    if '判断玩家和对方是不是已经约好了' in sys:
+        out = {"agreed": True, "day_offset": 2, "time": "18:00", "place": "弘大烤肉店", "what": "和书娟吃烤肉"}
+    elif '把下面每一句中文翻成韩文' in sys:
         n = len([l for l in user.split('\n') if re.match(r'^\d+\. ', l)])
         out = {"ko": [f"번역된 말 {i+1}" for i in range(n)]}
     elif '现在是一次线下见面' in sys:
