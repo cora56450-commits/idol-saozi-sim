@@ -44,9 +44,9 @@
       const bar = (k, v, cls) => `<div class="ds-row ${cls}"><span>${k}</span><i><b style="width:${v}%"></b></i><em>${v}</em></div>`;
       const nx = Game.nextSlot(), d = Game.pendingDate();
       el.innerHTML = `<div class="ds-time">${UI.clock()}<small>${esc(Game.workStatus().replace(/，.*$/, ''))}</small></div>
-        ${d ? `<div class="ds-date">约好了 · ${esc(d.time)} · ${esc(d.place)}</div>` : ''}
+        ${d ? `<div class="ds-date">约好了 · ${esc(d.time)}${(d.who || '他') !== '他' ? ' · ' + esc(Game.whoName(d.who)) : ''}<small>${esc(d.place)}</small></div>` : ''}
         ${bar('感情', S.aff, 'aff')}${bar('曝光', S.exp, 'exp')}${S.amb > 0 ? bar('暧昧', S.amb, 'amb') : ''}
-        ${d && (!nx || d.min <= nx[0]) ? `<button class="ds-next" id="ds-next">等他来 ▸ ${esc(d.time)}</button>`
+        ${d && (!nx || d.min <= nx[0]) ? `<button class="ds-next" id="ds-next">${(d.who || '他') === '他' ? '等他来' : '去赴约'} ▸ ${esc(d.time)}</button>`
           : nx ? `<button class="ds-next" id="ds-next">往后过 ▸ ${Game.hhmm(nx[0])} ${esc(nx[1])}</button>` : `<div class="ds-late">今天很晚了，吃完便当睡觉吧</div>`}`;
       const b = $('#ds-next', el); if (b) b.onclick = () => Main.skipTime();
     },

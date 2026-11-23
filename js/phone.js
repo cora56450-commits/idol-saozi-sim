@@ -147,7 +147,7 @@
       } else if (me) {
         inner = `<div class="bubble">${m.ko ? esc(m.ko) + `<span class="zh">${esc(m.zh)}</span>` : esc(m.zh)}</div>`;
       } else {
-        inner = `<div class="bubble">${esc(m.ko)}<span class="zh">${esc(m.zh)}</span>${m.note ? `<span class="note">${esc(m.note)}</span>` : ''}</div>`;
+        inner = `<div class="bubble">${esc(m.ko)}<span class="zh">${esc(m.zh)}</span>${m.note && m.type === 'link' ? `<span class="note">${esc(m.note)}</span>` : ''}</div>`; // 普通文字消息不显示 note（AI 有时会在里面写「顺口关心」这种旁白）
       }
       if (me) return `<div class="msg me"><div class="col">${inner}</div></div>`;
       const who = m.speaker || Game.CHATS[chatId].who;
@@ -198,8 +198,9 @@
         if (j.player_ko) me.ko = j.player_ko;
         Game.applyFx(j.delta, 'chat');
         if (j.flags && j.flags.includes('date_promised') && j.date && (typeof j.date === 'string' || Object.keys(j.date).length)) {
-          const d = Game.addDate(j.date);
-          if (d) { Game.remember(`约好了：${d.day === S.day ? '今天' : '明天'} ${d.time} ${d.place}（${d.what}）`); S.chats[id].push({ sys: `约好了 · ${d.day === S.day ? '今天' : '明天'} ${d.time} · ${d.place}`, day: S.day }); UI.deskStats(); }
+          const who = { he: '他', group: '他', friend: '郑书娟', dongmin: '东旻', siwon: '柳时元', eunji: '宋恩智', shop: '白秀珍' }[id];
+          const d = who && Game.addDate(j.date, S.day, who);
+          if (d) { const w = Game.dayWord(d.day); Game.remember(`和${Game.whoName(who)}约好了：${w} ${d.time} ${d.place}（${d.what}）`); S.chats[id].push({ sys: `约好了 · ${w} ${d.time} · ${d.place}`, day: S.day }); UI.deskStats(); }
         }
         this.go('chat', id);
         for (const r of (j.replies || [])) {

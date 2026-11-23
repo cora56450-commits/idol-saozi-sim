@@ -261,35 +261,38 @@
 
     // ---------- 线下见面（他在私聊里答应几点来）----------
     async runDate(d) {
-      const S = Game.S, hasKey = !!Game.settings().apiKey;
+      const S = Game.S, hasKey = !!Game.settings().apiKey, who = d.who || '他', isHe = who === '他', nm = Game.whoName(who);
       if (d.done || Story.ev) return;
       d.done = true;
-      Story.ev = { id: 'date', day: S.day, title: '见面', mode: 'gal', kind: 'date', blocks: [] };
-      Phone.close(); $('#phone').classList.add('hidden');
+      Story.ev = { id: 'date', day: S.day, title: '见面', mode: 'gal', kind: 'date', blocks: [], who };
+      Phone.close(); $('#phone').classList.add('hidden'); $('#notify').classList.add('hidden');
       Story.mode = 'gal'; Story.log = []; Story.storyMin = null; Story.cgOn = false; Story._cgShown = {};
-      Sound.bgm('sweet');
-      Story.setBg(`assets/bg/${/家/.test(d.place) ? 'apartment' : /江|兜风|车/.test(d.place) ? 'hanriver' : 'parking'}.jpg`);
-      $('#scene-sprite').style.display = 'none'; $('#scene-section').innerHTML = `<span>${esc(d.time)} · ${esc(d.place)}</span>`;
+      Sound.bgm(isHe ? 'sweet' : 'theme');
+      const P = d.place + ' ' + (d.what || '');
+      const bg = /家/.test(d.place) && !/他家|她家里吃饭/.test(d.place) ? 'apartment' : /烤肉|고기|肉|酒|吃|餐|炸鸡|饭|聚/.test(P) ? 'bbq' : /江|兜风|车/.test(P) ? 'hanriver' : /公司|练习室/.test(P) ? 'corridor' : isHe ? 'parking' : 'bbq';
+      Story.setBg(`assets/bg/${bg}.jpg`);
+      $('#scene-sprite').style.display = 'none'; $('#scene-section').innerHTML = `<span>${esc(d.time)} · ${esc(d.place)}${isHe ? '' : ' · ' + esc(nm)}</span>`;
       $('#choices').innerHTML = ''; $('#dialog').classList.remove('hidden');
       UI.show('scr-scene');
       const say = async (l) => {
-        const b = l.t === 'say' ? { t: 'say', who: '他', ko: l.ko || '', zh: l.zh || '' } : { t: 'nar', text: l.text || '' };
+        const sp = l.who && !/^(他|徐允在|允在)$/.test(l.who) ? (Object.keys(CONFIG.NAMES).find(k => CONFIG.NAMES[k] === l.who || k === l.who) || l.who) : who;
+        const b = l.t === 'say' ? { t: 'say', who: sp, ko: l.ko || '', zh: l.zh || '' } : { t: 'nar', text: l.text || '' };
         if (b.t === 'nar' && !b.text) return;
         Story.show(b); Story.logLine(b); await Story.wait();
       };
-      let aff = 0, exp = 0;
+      let aff = 0, exp = 0, amb = 0;
       const turn = async (phase, text) => {
         if (!hasKey) return null;
-        UI.loading(true, phase === 'open' ? '他快到了' : '他在想怎么回');
+        UI.loading(true, phase === 'open' ? (isHe ? '他快到了' : '出门赴约') : '在想怎么回');
         try { const j = await API.dateTurn(phase, d, Story.log.join('\n'), text); UI.loading(false); return j; }
         catch (e) { UI.loading(false); console.warn(e); return null; }
       };
       // 开场
       let j = await turn('open');
       if (j && j.lines && j.lines.length) { for (const l of j.lines) await say(l); }
-      else {
+      else if (isHe) {
         for (const l of [{ t: 'nar', text: '门铃没响。手机先亮了：他发来一个「도착」（到了）。' }, { t: 'nar', text: '你开门的时候，他已经站在门口，帽檐压得很低，口罩拉到下巴。' }, { t: 'say', ko: '빨리 들여보내줘 추워', zh: '快让我进去，好冷' }]) await say(l);
-      }
+      } else await say({ t: 'nar', text: `你到的时候，${nm}已经在了。` });
       // 聊几轮
       for (let round = 0; round < 4; round++) {
         const r = await this.dateInput();
@@ -298,20 +301,27 @@
         UI.tick(20);
         j = await turn('talk', r.text);
         if (!j) { await say({ t: 'nar', text: hasKey ? '（API 出错了，这一轮他的回答跳过。）' : '（还没有设置 API，见面里的对话要设置以后才能用。）' }); if (!hasKey) break; continue; }
-        aff += j.fx.aff; exp += j.fx.exp;
+        aff += j.fx.aff; exp += j.fx.exp; amb += j.fx.amb;
         for (const l of (j.lines || [])) await say(l);
         if (j.leave) break;
       }
       // 收尾
       UI.tick(20);
-      j = await turn('close', '（她送他到门口）');
-      if (j && j.lines && j.lines.length) { aff += j.fx.aff; for (const l of j.lines) await say(l); }
-      else for (const l of [{ t: 'say', ko: '나 간다. 문 잠그고 자', zh: '我走了。锁好门睡觉' }, { t: 'nar', text: '门关上以后，楼道里的声控灯亮了一会儿，又灭了。' }]) await say(l);
-      // 见面：感情 +2，曝光 +1（在外面 +3）；聊天里的加减压在 ±6 / 4 以内
-      aff = Math.max(-6, Math.min(6, aff)) + 2; exp = Math.min(4, exp) + (/家/.test(d.place) ? 1 : 3);
-      Game.applyFx({ aff, exp }, 'event');
-      S.lastDateDay = S.day;
-      Game.remember(`${d.time} 他来见她（${d.place}${d.what ? '，' + d.what : ''}），待到 ${UI.clock()} 才走`);
+      j = await turn('close', isHe ? '（她送他到门口）' : '（差不多该散了）');
+      if (j && j.lines && j.lines.length) { aff += j.fx.aff; amb += j.fx.amb; for (const l of j.lines) await say(l); }
+      else if (isHe) for (const l of [{ t: 'say', ko: '나 간다. 문 잠그고 자', zh: '我走了。锁好门睡觉' }, { t: 'nar', text: '门关上以后，楼道里的声控灯亮了一会儿，又灭了。' }]) await say(l);
+      else await say({ t: 'nar', text: '你们在路口分开，各自回家。' });
+      if (isHe) {
+        // 见面：感情 +2，曝光 +1（在外面 +3）；聊天里的加减压在 ±6 / 4 以内
+        aff = Math.max(-6, Math.min(6, aff)) + 2; exp = Math.min(4, exp) + (/家/.test(d.place) ? 1 : 3);
+        Game.applyFx({ aff, exp }, 'event');
+        S.lastDateDay = S.day;
+        Game.remember(`${d.time} 他来见她（${d.place}${d.what ? '，' + d.what : ''}），待到 ${UI.clock()} 才走`);
+      } else {
+        // 和别人见面不动感情 / 曝光；柳时元会动暧昧值
+        if (who === '柳时元') Game.applyFx({ amb: Math.max(-6, Math.min(6, amb)) }, 'event');
+        Game.remember(`${d.time} 和${nm}见了面（${d.place}${d.what ? '，' + d.what : ''}）`);
+      }
       Story.ev = null;
       $('#scene-section').innerHTML = '';
       UI.renderDesk();
@@ -324,7 +334,7 @@
         const box = $('#choices'); box.classList.remove('hidden');
         $('#dialog').classList.add('hidden');
         box.innerHTML = `<div class="free-box"><textarea placeholder="和他说……（打中文）"></textarea><button class="send"><img src="assets/ui/ic_send.png" alt="发送"></button></div>
-          <button class="btn-choice date-leave"><span>差不多了，送他走</span></button>`;
+          <button class="btn-choice date-leave"><span>${(Story.ev && Story.ev.who && Story.ev.who !== '他') ? '差不多了，散了吧' : '差不多了，送他走'}</span></button>`;
         const done = (r) => { box.innerHTML = ''; box.classList.add('hidden'); $('#dialog').classList.remove('hidden'); res(r); };
         box.querySelector('.send').onclick = () => { const t = box.querySelector('textarea').value.trim(); if (t) done({ text: t }); };
         box.querySelector('textarea').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); box.querySelector('.send').click(); } };
@@ -336,10 +346,16 @@
       const S = Game.S;
       const d = Game.pendingDate();
       if (d) {
-        const wait = await UI.confirm(`他说 ${d.time} 会来（${d.place}）。`, '等他来', '先睡了（放他鸽子）');
+        const isHe = (d.who || '他') === '他', nm = Game.whoName(d.who || '他');
+        const wait = await UI.confirm(isHe ? `他说 ${d.time} 会来（${d.place}）。` : `和${nm}约了 ${d.time}（${d.place}）。`, isHe ? '等他来' : '去赴约', isHe ? '先睡了（放他鸽子）' : '不去了（放鸽子）');
         if (wait) { if ((S.minutes || 0) < d.min) S.minutes = d.min; await UI.transition(d.time, '约好的时间到了', 1400); await this.runDate(d); return; }
-        d.done = true; Game.applyFx({ aff: -3 }, 'event'); Game.remember(`约好 ${d.time} 见面，她先睡了，放了他鸽子`);
-        S.chats.he.push({ day: S.day, speaker: '他', ko: '누나 자?', zh: '姐姐睡了？' }, { day: S.day, speaker: '他', ko: '…문 앞까지 왔는데', zh: '……我都到门口了' });
+        d.done = true; Game.remember(`约好 ${d.time} 和${nm}见面，她没去，放了鸽子`);
+        if (isHe) {
+          Game.applyFx({ aff: -3 }, 'event');
+          S.chats.he.push({ day: S.day, speaker: '他', ko: '누나 자?', zh: '姐姐睡了？' }, { day: S.day, speaker: '他', ko: '…문 앞까지 왔는데', zh: '……我都到门口了' });
+        } else if (d.who === '郑书娟') S.chats.friend.push({ day: S.day, speaker: '郑书娟', ko: '야 어디야??', zh: '喂 你人呢？？' }, { day: S.day, speaker: '郑书娟', ko: '나 혼자 고기 굽고 있다 진짜', zh: '我一个人在这烤肉 真的' });
+        UI.deskStats();
+        return this.endDay();
       }
       const ok = await UI.confirm(`结束第 ${S.day} 天？`, '吃完便当，睡觉', '再玩会儿');
       if (!ok) return;

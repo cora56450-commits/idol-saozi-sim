@@ -74,7 +74,7 @@
 今天的固定事件：${ev ? ev.title : '无'}
 今天他的行程：${SCHEDULE.todayPlan(S.day)}
 现在时间：${UI.clock()}；她现在：${Game.workStatus()}
-${S.dates && S.dates.length ? '已经约好的见面：' + S.dates.map(d => `第${d.day}天 ${d.time} ${d.place}（${d.what || ''}）`).join('；') + '\n' : ''}一直有效的事（不要和这些矛盾）：
+${S.dates && S.dates.length ? '已经约好的见面：' + S.dates.filter(d => !d.done).map(d => `第${d.day}天 ${d.time} 和${Game.whoName(d.who || '他')} ${d.place}（${d.what || ''}）`).join('；') + '\n' : ''}一直有效的事（不要和这些矛盾）：
 ${(S.facts || []).map(f => '- ' + f).join('\n') || '- （无）'}
 最近发生的事：
 ${S.recent.slice(-8).map(r => '- ' + r).join('\n') || '- （刚开始）'}
@@ -188,10 +188,11 @@ ${extra || ''}`;
     // 线下见面（邀约）：phase = open / talk / close
     async dateTurn(phase, date, history, playerText) {
       const sys = common() + '\n\n' + PROMPTS.date + `\n\n输出格式：\n${PROMPTS.dateFormat}`;
-      const user = stateBlock() + `\n【这次见面】${date.place || '她家'}，约的是 ${date.time}（${date.what || ''}）；现在 ${UI.clock()}\n【今天私聊里最近的话】\n${transcript('he', 14) || '（无）'}\n\n【这次见面到目前为止】\n${history || '（刚开始）'}\n\nphase：${phase}` + (playerText ? `\n【玩家这一轮说的话（中文原话）】\n${playerText}` : '');
+      const who = date.who || '他', cid = { '他': 'he', '郑书娟': 'friend', '东旻': 'dongmin', '柳时元': 'siwon', '宋恩智': 'eunji', '白秀珍': 'shop' }[who] || 'he';
+      const user = stateBlock() + `\n【这次见面的人】${who === '他' ? '徐允在' : Game.whoName(who)}\n【这次见面】${date.place || '她家'}，约的是 ${date.time}（${date.what || ''}）；现在 ${UI.clock()}\n【和这个人最近的聊天】\n${transcript(cid, 14) || '（无）'}\n\n【这次见面到目前为止】\n${history || '（刚开始）'}\n\nphase：${phase}` + (playerText ? `\n【玩家这一轮说的话（中文原话）】\n${playerText}` : '');
       const j = await callJSON(sys, user, 1400);
       j.fx = j.fx || {};
-      j.fx.aff = Math.max(-3, Math.min(3, +j.fx.aff || 0)); j.fx.exp = Math.max(0, Math.min(2, +j.fx.exp || 0));
+      j.fx.aff = Math.max(-3, Math.min(3, +j.fx.aff || 0)); j.fx.exp = Math.max(0, Math.min(2, +j.fx.exp || 0)); j.fx.amb = Math.max(-3, Math.min(3, +j.fx.amb || 0));
       return j;
     },
 

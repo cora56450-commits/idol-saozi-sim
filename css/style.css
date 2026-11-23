@@ -400,3 +400,4 @@ input, textarea { font-family: inherit; }
 .ds-late { margin-top: 12px; font-size: 13px; color: var(--grey); text-align: center; }
 .day-sep.sys { color: var(--red); }
 .choices .date-leave { margin-top: 10px; }
+.ds-date small { display: block; font-size: 12px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

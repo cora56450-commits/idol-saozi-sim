@@ -139,18 +139,21 @@
     hhmm(min) { return `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`; },
 
     // ---- 约好的见面 ----
-    addDate(d, nowDay) {
+    addDate(d, nowDay, who) {
+      who = who || '他';
       const S = this.S; S.dates = S.dates || [];
       if (!d || typeof d !== 'object') { const t = String(d || '').match(/(\d{1,2})[:：](\d{2})/); d = { time: t ? `${t[1]}:${t[2]}` : '23:30', place: '她家', what: String(d || '') }; }
       const t = String(d.time || '23:30').match(/(\d{1,2})[:：](\d{2})/) || [0, 23, 30];
       let min = (+t[1]) * 60 + (+t[2]); if (min < 360) min += 1440;
-      const day = (nowDay || S.day) + (+d.day_offset > 0 ? 1 : 0);
-      if (S.dates.some(x => x.day === day && !x.done)) return null; // 一天只约一次
-      const x = { day, min, time: this.hhmm(min), place: d.place || '她家', what: d.what || '', done: false };
+      const day = (nowDay || S.day) + Math.max(0, Math.min(7, Math.round(+d.day_offset || 0)));
+      if (S.dates.some(x => x.day === day && (x.who || '他') === who && !x.done)) return null; // 同一个人一天只约一次
+      const x = { day, min, time: this.hhmm(min), place: d.place || (who === '他' ? '她家' : '外面'), what: d.what || '', who, done: false };
       S.dates.push(x);
       return x;
     },
-    pendingDate() { const S = this.S; return (S.dates || []).find(x => x.day === S.day && !x.done) || null; },
+    pendingDate() { const S = this.S; return (S.dates || []).filter(x => x.day === S.day && !x.done).sort((a, b) => a.min - b.min)[0] || null; },
+    dayWord(day) { const k = day - this.S.day; return k === 0 ? '今天' : k === 1 ? '明天' : k === 2 ? '后天' : this.dateStr(day).slice(5); },
+    whoName(who) { return (CONFIG.NAMES[who] || who); },
 
     // ---- 存档 ----
     save(slot) {

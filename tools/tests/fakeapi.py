@@ -18,6 +18,8 @@ def reply(body):
             out = {"player_ko": "", "replies": [{"type": "text", "ko": "누나 나 대기실", "zh": "姐姐我在待机室", "note": ""}], "delta": {}, "flags": [], "date": {}}
         else:
             out = {"player_ko": "오늘 와", "replies": [{"type": "text", "ko": "ㅇㅋ 9시에 갈게", "zh": "好 九点过去", "note": ""}], "delta": {"affection": 1, "exposure": 0}, "flags": ["date_promised"], "date": {"day_offset": 0, "time": "21:00", "place": "她家", "what": "收工后过来"}}
+    elif '【玩家刚发来的话' in user and '周六' in user.split('【玩家刚发来的话')[-1]:
+        out = {"player_ko": "토요일에 봐!", "replies": [{"speaker": "郑书娟", "type": "text", "ko": "6시 홍대 ㅇㅋ", "zh": "六点弘大 行", "note": ""}], "delta": {}, "flags": ["date_promised"], "date": {"day_offset": 2, "time": "18:00", "place": "弘大烤肉店", "what": "和书娟吃烤肉喝酒"}}
     else:
         out = {"player_ko": "응", "replies": [{"speaker": "白秀珍", "type": "text", "ko": "지은아 오늘 닭가슴살 또 모자라", "zh": "智恩啊 今天鸡胸肉又不够了", "note": ""}], "delta": {}}
     return json.dumps({"choices": [{"message": {"content": json.dumps(out, ensure_ascii=False)}}]})
