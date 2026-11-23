@@ -188,7 +188,7 @@
 
     async sendChat(id, text) {
       const S = Game.S;
-      if (this.busy) return;
+      if (this.busyIds[id]) return;
       const me = { me: true, zh: text, day: S.day, t: Game.nowMin() };
       S.chats[id].push(me);
       this.go('chat', id);
@@ -216,7 +216,7 @@
         API.translateKo([text]).then(ko => { if (ko[0] && !me.ko) { me.ko = ko[0]; if (this.view === 'chat' && this.arg === id) this.go('chat', id); } }).catch(() => {});
         return;
       }
-      this.busy = true;
+      this.busyIds[id] = true;
       const box = $('#msgs');
       box.insertAdjacentHTML('beforeend', `<div class="typing" id="typing">입력 중…</div>`);
       $('.app-body', scr()).scrollTop = 1e9;
@@ -226,7 +226,7 @@
         this.lastReply[id] = Game.nowMin();
         Game.applyFx(j.delta, 'chat');
         this.takeDate(id, j);
-        this.go('chat', id);
+        this.refreshChat(id);
         for (const r of (j.replies || [])) {
           await sleep(700 + Math.random() * 1200);
           const m = { day: S.day, t: Game.nowMin(), speaker: r.speaker || (id === 'he' ? '他' : Game.CHATS[id].who) };
@@ -236,14 +236,15 @@
           else { m.ko = r.ko; m.zh = r.zh; m.note = r.note; }
           S.chats[id].push(m);
           Sound.sfx('msg');
-          if (this.view === 'chat' && this.arg === id) this.go('chat', id); else S.unread[id] = (S.unread[id] || 0) + 1;
+          if (this.view === 'chat' && this.arg === id) this.refreshChat(id); else { S.unread[id] = (S.unread[id] || 0) + 1; this.refreshChat(id); UI.updateBadge(); }
         }
         UI.tick(2);
       } catch (e) {
         S.chats[id].push({ ko: '…', zh: '（API 出错：' + e.message + '）', speaker: '他', day: S.day });
-        this.go('chat', id);
+        this.refreshChat(id);
       }
-      this.busy = false;
+      this.busyIds[id] = false;
+      if (this.view === 'chat' && this.arg === id) this.refreshChat(id); // 收起「입력 중…」
       Main.checkExposure();
     },
 
@@ -254,6 +255,21 @@
       const who = { he: '他', group: '他', friend: '郑书娟', dongmin: '东旻', siwon: '柳时元', eunji: '宋恩智', shop: '白秀珍' }[id];
       const d = who && Game.addDate(j.date, S.day, who);
       if (d) { const w = Game.dayWord(d.day); Game.remember(`和${Game.whoName(who)}约好了：${w} ${d.time} ${d.place}（${d.what}）`); S.chats[id].push({ sys: `约好了 · ${w} ${d.time} · ${d.place}`, day: S.day, t: Game.nowMin() }); UI.deskStats(); }
+    },
+
+    // 回复到了：正在看这个聊天就原地刷新（保留没发出去的草稿）；在看别的地方就只亮未读，不跳过去
+    busyIds: {},
+    refreshChat(id) {
+      if (!this.isOpen()) return;
+      const v = this.view;
+      if (v === 'chat' && this.arg === id) {
+        const ta = $('#chat-in'), keep = ta ? ta.value : '';
+        this.go('chat', id, true);
+        const t2 = $('#chat-in'); if (t2 && keep) t2.value = keep;
+        if (this.busyIds[id] && !$('#typing')) { const box = $('#msgs'); if (box) box.insertAdjacentHTML('beforeend', `<div class="typing" id="typing">입력 중…</div>`); }
+        const body = $('.app-body', scr()); if (body) body.scrollTop = body.scrollHeight;
+      } else if (v === 'home' || v === 'toktok') this.go(v, this.arg, true);
+      else if (v === 'chat') { const b = $('.app-head .back', scr()); if (b && !b.querySelector('.dot')) b.insertAdjacentHTML('beforeend', '<i class="dot"></i>'); }
     },
 
     // ---------- 不秒回 ----------
@@ -323,7 +339,7 @@
         Sound.sfx('msg');
         const v = this.view;
         if (v === 'chat' && this.arg === id) {
-          if (!this.busy) { const ta = $('#chat-in'), keep = ta ? ta.value : ''; this.go('chat', id, true); const t2 = $('#chat-in'); if (t2 && keep) t2.value = keep; }
+          if (!this.busyIds[id]) this.refreshChat(id);
         } else if (v === 'home' || v === 'toktok') this.go(v, this.arg, true);
         else { const b = $('.app-head .back', scr()); if (b && !b.querySelector('.dot')) b.insertAdjacentHTML('beforeend', '<i class="dot"></i>'); }
       } else if (first && !Story.ev) UI.notify('toktok', Game.CHATS[id].name, first.type === 'sticker' ? '[表情]' : (first.ko || '[消息]'), () => { this.open('home'); this.go('chat', id); });
@@ -434,7 +450,7 @@
       if (view === 'home') $$('[data-app]', root).forEach(a => a.onclick = () => this.go(a.dataset.app));
       if (view === 'toktok') $$('[data-chat]', root).forEach(a => a.onclick = () => this.go('chat', a.dataset.chat));
       if (view === 'chat') {
-        const send = () => { const t = $('#chat-in').value.trim(); if (t && !this.busy) this.sendChat(arg, t); };
+        const send = () => { const t = $('#chat-in').value.trim(); if (t && !this.busyIds[arg]) this.sendChat(arg, t); };
         $('#chat-send').onclick = send;
         $('#chat-in').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } };
       }
