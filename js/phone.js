@@ -211,9 +211,9 @@
       const P = S.pendingReply = S.pendingReply || {};
       if (P[id] || this.isBusy(id)) {
         me.unread = true;
-        if (!P[id]) P[id] = { since: me.t, due: this.replyDue(me.t) };
+        if (!P[id]) P[id] = { since: me.t, due: this.replyDue(me.t, id) };
         this.go('chat', id);
-        API.translateKo([text]).then(ko => { if (ko[0] && !me.ko) { me.ko = ko[0]; if (this.view === 'chat' && this.arg === id) this.go('chat', id); } }).catch(() => {});
+        API.translateKo([text]).then(ko => { if (ko[0] && !me.ko) { me.ko = ko[0]; if (this.view === 'chat' && this.arg === id) this.refreshChat(id); } }).catch(() => {});
         return;
       }
       this.busyIds[id] = true;
@@ -275,25 +275,42 @@
     // ---------- 不秒回 ----------
     IDOL_CHATS: ['he', 'dongmin', 'siwon', 'group'],
     lastReply: {},
-    // 现在发过去，他会不会在忙
-    isBusy(id) {
-      if (!this.IDOL_CHATS.includes(id)) return false;
+    // 现在发过去，对方会不会在忙。返回 [忙的几率, 最短等几分钟, 最长等几分钟]
+    busyProfile(id) {
       const S = Game.S, now = Game.nowMin(), h = Math.floor(now / 60) % 24;
-      // 刚刚还在来回聊（10 分钟内他回过），大概率接着秒回
-      if (this.lastReply[id] != null && now - this.lastReply[id] <= 10 && this.lastReply[id] <= now) return Math.random() < 0.15;
-      const phase = SCHEDULE.phaseOf(S.day);
-      let p;
-      if (h >= 2 && h < 8) p = 0.9;            // 睡觉
-      else if (h >= 23 || h < 2) p = 0.2;      // 深夜收工，最常秒回
-      else if (h >= 20) p = 0.4;
-      else p = /空档期$/.test(phase) ? 0.45 : 0.75; // 白天：打歌 / 合练 / 拍剧时基本看不了手机
-      return Math.random() < p;
+      const sleeping = h >= 2 && h < 8;
+      if (this.IDOL_CHATS.includes(id)) { // 爱豆：打歌 / 合练 / 拍剧时基本看不了手机，深夜收工最常秒回
+        const phase = SCHEDULE.phaseOf(S.day);
+        if (sleeping) return [0.9, 30, 120];
+        if (h >= 23 || h < 2) return [0.2, 20, 60];
+        if (h >= 20) return [0.4, 30, 90];
+        return [/空档期$/.test(phase) ? 0.45 : 0.75, 40, 150];
+      }
+      const w = Game.dateOf(S.day).getDay(), weekday = w !== 0 && w !== 6;
+      if (id === 'friend' || id === 'eunji') { // 上班族：上班时间偷偷回，开会就晚了；周末睡懒觉
+        if (sleeping || (h >= 1 && h < 9)) return [0.85, 30, 90];
+        if (weekday && h >= 9 && h < 18) return [0.5, 15, 70];
+        return [0.2, 10, 40];
+      }
+      if (id === 'shop') { // 店里：午市最忙顾不上看手机，下班后不一定看工作群
+        if (!Game.isWorkDay() || h >= 20 || h < 9) return [0.6, 30, 120];
+        if (h >= 11 && h < 14) return [0.6, 20, 60];
+        return [0.25, 5, 30];
+      }
+      if (id === 'work') return weekday && h >= 9 && h < 18 ? [0.2, 5, 30] : [0.7, 30, 120];
+      return [0, 0, 0];
     },
-    // 什么时候能回：白天隔 40 分钟到两个多小时；夜里睡着了就等到早上
-    replyDue(t) {
-      const h = Math.floor(t / 60) % 24;
-      if (h >= 2 && h < 8) return Math.max(t + 30, (t >= 1440 ? 1440 : 0) + 8 * 60 + 40 + Math.floor(Math.random() * 40)) % (27 * 60);
-      return t + 40 + Math.floor(Math.random() * 110);
+    isBusy(id) {
+      const now = Game.nowMin();
+      // 刚刚还在来回聊（10 分钟内回过），大概率接着秒回
+      if (this.lastReply[id] != null && now - this.lastReply[id] <= 10 && this.lastReply[id] <= now) return Math.random() < 0.15;
+      return Math.random() < this.busyProfile(id)[0];
+    },
+    // 什么时候能回：按各自的忙法等一会儿；夜里睡着了就等到早上
+    replyDue(t, id) {
+      const h = Math.floor(t / 60) % 24, [, lo, hi] = this.busyProfile(id || 'he');
+      if (h >= 2 && h < 8) return Math.max(t + 30, (t >= 1440 ? 1440 : 0) + 8 * 60 + 40 + Math.floor(Math.random() * 40));
+      return t + lo + Math.floor(Math.random() * Math.max(1, hi - lo));
     },
     // 时间往后走了：到点的人一起回（回复的时间记成他真正看到手机的那个点）
     async flushPending(force) {
@@ -307,7 +324,7 @@
         const mine = S.chats[id].filter(m => m.me && m.unread);
         const at = Math.min(p.due, Math.max(now, p.since));
         try {
-          const text = mine.map(m => m.zh).join('\n') + `\n（这${mine.length > 1 ? '几' : ''}条是她 ${Game.hhmm(p.since)} 发的，他一直在忙，${Game.hhmm(at)} 才看到手机。回的时候可以顺口说一句刚才在干嘛、为什么没回。）`;
+          const text = mine.map(m => m.zh).join('\n') + `\n（这${mine.length > 1 ? '几' : ''}条是她 ${Game.hhmm(p.since)} 发的，${id === 'he' ? '他' : '对方'}一直在忙，${Game.hhmm(at)} 才看到手机。回的时候可以顺口说一句刚才在干嘛、为什么没回（不用每次都解释）。）`;
           const j = await API.chat(id, text);
           mine.forEach(m => { m.unread = false; });
           Game.applyFx(j.delta, 'chat');
