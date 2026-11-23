@@ -201,12 +201,12 @@
     async skipTime() {
       const S = Game.S;
       if (!S || Story.ev || this._skipping) return;
-      const nx = Game.nextSlot(); if (!nx) return;
+      const nx = Game.nextSlot(), d = Game.pendingDate();
+      if (!nx && !d) return;
       this._skipping = true;
       Phone.close();
-      const d = Game.pendingDate();
-      if (d && d.min <= nx[0]) { // 约好的时间先到
-        S.minutes = d.min;
+      if (d && (!nx || d.min <= nx[0])) { // 约好的时间先到（或者已经是今天最后一个时间点了）
+        S.minutes = Math.max(S.minutes || 0, d.min);
         await UI.transition(d.time, '约好的时间到了', 1400);
         await this.runDate(d);
         this._skipping = false; return;
