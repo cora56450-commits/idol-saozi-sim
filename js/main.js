@@ -36,12 +36,34 @@
       $$('#scr-setup .role').forEach(b => b.classList.toggle('sel', b.dataset.role === this.setupRole));
       if (!this.subTouched) $('#setup-sub').checked = this.setupRole === 'civ';
     },
+    // 中文名字 → 韩文读音（汉字词音 + 头音法则），已经是韩文的字原样保留
+    toKorean(s) {
+      if (!this._hj) { this._hj = {}; const H = window.HANJA || ''; for (let i = 0; i + 1 < H.length; i += 2) this._hj[H[i]] = H[i + 1]; }
+      const SUR = { '金': '김', '朴': '박', '卢': '노', '盧': '노', '罗': '나', '羅': '나', '林': '임', '李': '이', '柳': '유', '刘': '유', '劉': '유', '吕': '여', '梁': '양', '龙': '용', '陆': '육', '雷': '뇌' };
+      let out = '';
+      [...s].forEach((c, i) => {
+        if (/[가-힣]/.test(c)) { out += c; return; }
+        let k = (i === 0 && SUR[c]) || this._hj[c];
+        if (!k) return;
+        if (out.length === 0) { // 头音法则
+          const code = k.charCodeAt(0) - 0xAC00, L = Math.floor(code / 588), V = Math.floor((code % 588) / 28), T = code % 28;
+          let nl = L;
+          if (L === 5 || L === 2) nl = (L === 5 && ![2, 6, 7, 12, 17, 20].includes(V)) ? 2 : ([2, 6, 7, 12, 17, 20].includes(V) ? 11 : L);
+          k = String.fromCharCode(0xAC00 + nl * 588 + V * 28 + T);
+        }
+        out += k;
+      });
+      return out;
+    },
     bindSetup() {
       $$('#scr-setup .role').forEach(b => b.onclick = () => { this.setupRole = b.dataset.role; this.refreshSetup(); });
       $('#setup-sub').onchange = () => { this.subTouched = true; };
+      $('#setup-name').oninput = () => { $('#setup-name-ko').value = Main.toKorean($('#setup-name').value.trim()) || ''; };
       $('#scr-setup [data-act=back]').onclick = () => UI.show('scr-title');
       $('#scr-setup [data-act=start]').onclick = () => {
-        Game.newGame({ role: this.setupRole, name: $('#setup-name').value.trim() || '지은', sub: $('#setup-sub').checked });
+        const zh = $('#setup-name').value.trim() || '智恩';
+        const ko = $('#setup-name-ko').value.trim() || this.toKorean(zh) || '지은';
+        Game.newGame({ role: this.setupRole, name: ko, nameZh: zh, sub: $('#setup-sub').checked });
         this.playIntro().then(() => {
           if (!Game.settings().apiKey) UI.notify('toktok', '提示', '还没设置 API：聊天、论坛、泡泡会用离线样例。桌上的专辑 → 设置');
           this.startDay();
@@ -76,7 +98,7 @@
     // ---------- 开场介绍 ----------
     async playIntro() {
       const S = Game.S, I = INTRO;
-      const lines = [...I.before, ...I[S.role], ...I.after].map(s => ({ t: 'nar', text: s.replace(/\{name\}/g, S.name) }));
+      const lines = [...I.before, ...I[S.role], ...I.after].map(s => ({ t: 'nar', text: s.replace(/\{name\}/g, S.nameZh && S.nameZh !== S.name ? `${S.nameZh}（${S.name}）` : S.name) }));
       EVENTS.intro = { id: 'intro', day: 1, title: '', mode: 'gal', kind: 'intro', blocks: lines };
       await Story.play('intro');
     },

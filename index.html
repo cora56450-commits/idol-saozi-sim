@@ -34,7 +34,8 @@
       <div class="panel setup-panel">
         <div class="panel-inner">
           <h2>开局</h2>
-          <label class="row"><span>你的名字（韩文）</span><input id="setup-name" maxlength="8" value="지은"></label>
+          <label class="row"><span>你的名字</span><input id="setup-name" maxlength="6" value="智恩" placeholder="打中文就行"></label>
+          <div class="row name-ko"><span>韩文名</span><input id="setup-name-ko" maxlength="8" value="지은"><small>自动转换，也可以自己改</small></div>
           <div class="row"><span>你的身份</span></div>
           <div class="role-pick">
             <button class="btn-choice role" data-role="civ"><span>圈外素人<small>弘大便当工作室老板，以前是他的粉丝</small></span></button>
@@ -104,6 +105,7 @@
 <script src="data/config.js"></script>
 <script src="data/events.js"></script>
 <script src="data/intro.js"></script>
+<script src="data/hanja.js"></script>
 <script src="js/prompts.js"></script>
 <script src="js/state.js"></script>
 <script src="js/api.js"></script>

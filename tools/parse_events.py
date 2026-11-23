@@ -89,6 +89,7 @@ events = {}; order = []
 cur = None; part = None
 cond = None; choice = None; opt = None
 section_who = None; section_ch = None
+rolecond = None; in_flash = False
 mode_root = None  # 'prologue' / 'events' / 'endings' / 'after'
 
 def new_event(eid, title, day, mode, kind="event"):
@@ -103,7 +104,8 @@ def add(b):
     if opt is not None and b.get('_nested'):
         b.pop('_nested', None); opt['after'].append(b); return
     b.pop('_nested', None)
-    if cond and 'if' not in b: b['if'] = cond
+    c = ' && '.join('(%s)' % x for x in (cond, rolecond) if x)
+    if c and 'if' not in b: b['if'] = c
     cur['blocks'].append(b)
 
 def end_choice():
@@ -114,6 +116,10 @@ stop_settle = False
 for raw in lines:
     line = raw.rstrip()
     s = line.strip()
+    if line.startswith('## ') or line.startswith('### ') or s.startswith('- '):
+        rolecond = None
+    if (line.startswith('## ') or line.startswith('### ')) and in_flash:
+        in_flash = False; add({'t': 'scene', 'mode': 'phone'})
     if line.startswith('## '):
         end_choice()
         h = line[3:]
@@ -130,7 +136,12 @@ for raw in lines:
             section_who = '他' if ('私聊' in h or '泡泡' in h) else None
             section_ch = 'bubble' if '泡泡' in h else ('forum' if '论坛' in h else ('chat' if '私聊' in h else None))
             if '论坛' in h: section_who = '论坛'
-            add({'t': 'section', 'text': re.sub(r'^[①-⑩]\s*', '', h)})
+            title = re.sub(r'（按身份）', '', re.sub(r'^[①-⑩]\s*', '', h)).strip()
+            if '闪回' in h:
+                in_flash = True
+                add({'t': 'scene', 'mode': 'gal', 'title': '闪回', 'sub': title.split('：')[-1], 'bg': {'civ': 'cg:ev_day1', 'staff': 'corridor'}})
+                continue
+            add({'t': 'section', 'text': title})
             continue
         m = re.match(r'^第\s*(\d+)\s*天\s*·\s*(.+)$', h)
         if m and mode_root == 'events':
@@ -196,6 +207,21 @@ for raw in lines:
         end_choice()
     if opt is not None and not raw.startswith(' '):
         end_choice()
+    tm = re.match(r'^画面暗下。标题出现[：:]\s*(.+)$', s)
+    if tm:
+        add({'t': 'title', 'text': re.sub(r'\*\*', '', tm.group(1)).strip()}); continue
+    rm = re.match(r'^\*\*(素人线|员工线)\*\*[：:]\s*(.+)$', s)
+    if rm:
+        rolecond = "role=='civ'" if rm.group(1) == '素人线' else "role=='staff'"
+        s = rm.group(2)
+        if in_flash:
+            parts = re.findall(r'[^。！？]*[。！？]」?|[^。！？]+$', s)
+            buf = ''
+            for x in parts:
+                if buf and len(buf) + len(x) > 70: add({'t': 'nar', 'text': buf}); buf = ''
+                buf += x
+            if buf: add({'t': 'nar', 'text': buf})
+            continue
     fm = re.match(r'^事件本身[：:](.*?)。(.*)$', s)
     if fm:
         fx, _ = parse_fx(fm.group(1)); add({'t': 'fx', 'fx': fx})
@@ -227,6 +253,27 @@ def clean(bs):
             for o in b['options']:
                 o.pop('_cond', None); clean(o['after'])
 for e in events.values(): clean(e['blocks'])
+# 线下事件里：旁白说到「手机亮了 / 发来」之后的台词是手机消息（不显示立绘），说到「推门进来 / 站在面前」之后又回到面对面
+PHONE_ON = re.compile(r'手机(亮|震|响)|发来|发了一|来了一条|又来一条|来消息|消息|已读|回了一|私聊|打字|语音|视频通话|电话')
+PHONE_OFF = re.compile(r'猫眼|门外|敲门|门口|楼梯|他说[：:]|推开|推门|走进|进来|进门|开门|站在|坐在|面前|身边|身后|旁边|对面|抬头|车里|车上|走过来|走廊|后台|见到|看到他|他来了|拉住|握住|抱住')
+def mark_phone(bs, on):
+    for b in bs:
+        if b['t'] == 'nar':
+            tx = b.get('text', '')
+            if PHONE_OFF.search(tx) and not re.search(r'手机|消息', tx): on = False
+            elif PHONE_ON.search(tx): on = True
+        elif b['t'] == 'section':
+            on = False
+        elif b['t'] == 'say' and on and not b.get('ch') and b.get('who') not in ('论坛', '泡泡', '粉丝在下面刷', '标题'):
+            b['ch'] = 'chat'
+        elif b['t'] == 'me' and on and not b.get('ch'):
+            b['ch'] = 'chat'
+        elif b['t'] == 'choice':
+            for o in b['options']: mark_phone(o.get('after', []), on)
+    return on
+for e in events.values():
+    if e['mode'] == 'gal': mark_phone(e['blocks'], False)
+
 open(OUT, 'w', encoding='utf-8').write(
     '// 由 tools/parse_events.py 从「固定文案.md」自动生成，不要手改；改文案请改 md 后重新运行\n'
     'window.EVENTS = ' + json.dumps(events, ensure_ascii=False, indent=1) + ';\n'

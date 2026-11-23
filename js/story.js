@@ -9,7 +9,7 @@
     async play(id) {
       const ev = EVENTS[id];
       if (!ev) return;
-      this.ev = ev; this.log = []; this._cgShown = {}; this.cgOn = false;
+      this.ev = ev; this.log = []; this._cgShown = {}; this.cgOn = false; this.storyMin = CONFIG.EVENT_TIME[id] != null ? CONFIG.EVENT_TIME[id] : null;
       document.querySelector('#alert').classList.add('hidden');
       this.mode = ev.mode;
       Sound.bgm(CONFIG.BGM_EVENT[id] || (ev.mode === 'gal' ? 'sweet' : 'theme'));
@@ -32,8 +32,54 @@
       await UI.tip(this.mode === 'gal' ? 'gal' : 'phoneStory');
       await this.run(ev.blocks);
       if (this.mode === 'phone') Phone.closeStory();
-      if (ev.kind === 'event') S.seen[ev.id] = true;
-      this.ev = null;
+      if (ev.kind === 'event') { S.seen[ev.id] = true; Game.addFact(ev.id); }
+      this.ev = null; this.storyMin = null;
+    },
+
+    // 旁白里的时间（「凌晨一点四十」「中午十二点零三分」）→ 剧情里手机状态栏的时间
+    parseTime(txt) {
+      const cn = s => { if (/^\d+$/.test(s)) return +s; const D = { 零: 0, 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+        if (s === '十') return 10; if (s[0] === '十') return 10 + (D[s[1]] || 0);
+        if (s.includes('十')) { const [a, b] = s.split('十'); return D[a] * 10 + (b ? D[b] || 0 : 0); }
+        return [...s].reduce((n, c) => n * 10 + (D[c] || 0), 0); };
+      const m = txt.match(/(?:^|[^第])(凌晨|清晨|早上|上午|中午|下午|傍晚|晚上|夜里|半夜|深夜)?([零〇一二两三四五六七八九十]{1,3}|\d{1,2})点(半|一刻|([零〇一二三四五六七八九十]{1,3}|\d{1,2})分?)?/);
+      if (!m || (!m[1] && !m[3]) || m.index > 4) return null; // 只认开头的时间（「那天晚上十一点」可以，「在下午三点」不算）
+      let h = cn(m[2]); const per = m[1] || '';
+      let min = m[3] === '半' ? 30 : m[3] === '一刻' ? 15 : m[4] ? cn(m[4]) : 0;
+      if (h > 24 || min > 59) return null;
+      if (/下午|傍晚|晚上|夜里|深夜/.test(per) && h < 12) h += 12;
+      if (per === '中午' && h < 6) h += 12;
+      if (/凌晨|半夜/.test(per) && h === 12) h = 0;
+      return (h % 24) * 60 + min;
+    },
+    setStoryTime(txt) {
+      const t = this.parseTime(txt || '');
+      if (t == null) return;
+      this.storyMin = t;
+      document.querySelectorAll('#phone .status-bar span:first-child').forEach(s => { s.textContent = UI.clock(); });
+    },
+
+    // 手机剧情中途切到线下画面（回忆等），再切回手机
+    async switchMode(b) {
+      if (b.mode === 'gal') {
+        if (b.title) await UI.transition(b.title, b.sub || '');
+        $('#phone').classList.add('hidden');
+        this.mode = 'gal';
+        let bg = b.bg; if (bg && typeof bg === 'object') bg = bg[Game.S.role];
+        $('#scene-sprite').style.display = 'none';
+        $('#scene-cg').classList.remove('on'); this.cgOn = false;
+        $('#scene-section').innerHTML = ''; $('#choices').innerHTML = '';
+        $('#dialog').classList.remove('hidden');
+        if (bg && bg.startsWith('cg:')) { this.setBg(this.bgFor(this.ev.id)); await this.showCG(bg.slice(3)); }
+        else this.setBg(bg ? `assets/bg/${bg}.jpg` : this.bgFor(this.ev.id));
+        UI.show('scr-scene');
+        await UI.tip('gal');
+      } else {
+        this.mode = 'phone'; this.cgOn = false;
+        UI.renderDesk();
+        $('#phone').classList.remove('hidden');
+        const log = $('#story-log'); if (log) log.scrollTop = log.scrollHeight;
+      }
     },
 
     bgFor(key) {
@@ -92,16 +138,20 @@
     async cgByMatch(b) {
       const txt = b.text || b.ko || b.zh || '';
       if (!txt) return;
+      if (this.cgOn && this._cgEnd && new RegExp(this._cgEnd).test(txt)) { $('#scene-cg').classList.remove('on'); this.cgOn = false; this._cgEnd = null; }
       const c = CONFIG.EVENT_CG.find(c => c.ev === this.ev.id && c.match && txt.includes(c.match) && (!c.role || c.role === Game.S.role));
-      if (c && !this._cgShown[c.img]) { this._cgShown[c.img] = true; await this.showCG(c.img); }
+      if (c && !this._cgShown[c.img]) { this._cgShown[c.img] = true; this._cgEnd = c.end || null; await this.showCG(c.img); }
     },
 
     async run(blocks) {
       for (const b of blocks) {
         if (!Game.check(b.if)) continue;
         await this.cgByMatch(b);
+        if (b.t === 'nar' || b.t === 'section') this.setStoryTime(b.text);
         switch (b.t) {
           case 'note': break;
+          case 'scene': await this.switchMode(b); break;
+          case 'title': await UI.transition(b.text, '', 2600); break;
           case 'fx': Game.applyFx(b.fx, 'event'); break;
           case 'section': this.section(b.text); break;
           case 'nar': case 'say': case 'me': case 'photo':
@@ -117,12 +167,12 @@
       const t = b.t === 'say' ? `${N(b.who)}：${b.ko}（${b.zh}）` : b.t === 'me' ? `玩家：${b.zh}` : b.t === 'photo' ? `${N(b.who)} 发来一张照片` : b.text;
       this.log.push(t); if (this.log.length > 24) this.log.shift();
       // 手机事件里的台词同步进聊天记录
-      if (this.mode === 'phone' && (b.t === 'say' || b.t === 'me' || b.t === 'photo')) {
+      if ((this.mode === 'phone' || b.ch === 'chat') && (b.t === 'say' || b.t === 'me' || b.t === 'photo')) {
         const map = { '他': 'he', '东旻': (Game.S.day >= 12 ? 'group' : 'dongmin'), '柳时元': 'siwon', '郑书娟': 'friend', '宋恩智': 'eunji', '弟弟': 'brother' };
         if (b.ch === 'bubble' || b.who === '论坛') return;
         const cid = b.t === 'me' ? 'he' : map[b.who];
         if (!cid) return;
-        const m = b.t === 'me' ? { me: true, zh: b.zh } : b.t === 'photo' ? { type: 'photo', note: b.text || '（照片）', speaker: b.who } : { ko: b.ko, zh: b.zh, speaker: b.who };
+        const m = b.t === 'me' ? { me: true, zh: b.zh } : b.t === 'photo' ? { type: 'photo', note: b.text || '（照片）', speaker: b.who } : { ko: b.ko, zh: b.zh, speaker: b.who, type: b.vtype, note: b.note };
         m.day = Game.S.day; m.fromEvent = true;
         (Game.S.chats[cid] = Game.S.chats[cid] || []).push(m);
       }
@@ -145,10 +195,12 @@
         const plate = $('#dlg-name');
         if (b.t === 'say' || b.t === 'photo') {
           plate.classList.remove('empty');
-          plate.querySelector('span').innerHTML = esc(N(b.who)) + (b.manner ? `<small>${esc(b.manner)}</small>` : '') + (b.ch === 'bubble' ? '<small>BLINK</small>' : '');
-          this.showSprite(b);
+          plate.querySelector('span').innerHTML = esc(N(b.who)) + (b.manner ? `<small>${esc(b.manner)}</small>` : '') + (b.ch === 'bubble' ? '<small>BLINK</small>' : '') + (b.ch === 'chat' ? '<small>톡톡</small>' : '');
+          // 手机消息：人不在场，不显示立绘
+          if (b.ch === 'chat' || b.ch === 'bubble' || b.t === 'photo') $('#scene-sprite').style.display = 'none';
+          else this.showSprite(b);
         } else if (b.t === 'me') {
-          plate.classList.remove('empty'); plate.querySelector('span').textContent = Game.S.name;
+          plate.classList.remove('empty'); plate.querySelector('span').textContent = Game.S.nameZh || Game.S.name;
         } else plate.classList.add('empty');
         $('#dlg-text').innerHTML = this.lineHTML(b);
       } else {
@@ -170,11 +222,12 @@
         idx = Math.max(0, opts.findIndex(o => o.label === S.outcome));
       } else {
         const r = await this.askChoice(opts, true);
-        if (r.free) { await this.freeOption(opts, r.text); return; }
+        if (r.free) { await this.freeOption(opts, r.text, b); return; }
         idx = r.index;
       }
       const o = opts[idx];
       S.lastChoice = idx + 1;
+      Game.addFact(`${this.ev.id}#${idx + 1}`);
       Game.applyFx(o.fx, 'event');
       (o.flags || []).forEach(f => Game.setFlag(f));
       if (!b.outcome) Game.remember(`「${this.ev.title.replace(/（.*?）$/, '')}」里选了：${o.label}`);
@@ -206,7 +259,7 @@
       });
     },
 
-    async freeOption(opts, text) {
+    async freeOption(opts, text, cb) {
       const S = Game.S;
       this.show({ t: 'me', zh: text }); this.logLine({ t: 'me', zh: text });
       if (!Game.settings().apiKey) {
@@ -216,7 +269,10 @@
       }
       UI.loading(true, '他在打字…');
       try {
-        const j = await API.storyFree(this.ev, this.log.join('\n'), opts, text);
+        const i = cb ? this.ev.blocks.indexOf(cb) : -1;
+        const rest = i >= 0 ? this.ev.blocks.slice(i + 1).filter(x => Game.check(x.if) && x.t !== 'note' && x.t !== 'fx') : [];
+        const ctx = { isLast: i >= 0 && rest.length === 0, next: i >= 0 ? this.upcoming(cb, 10) : '' };
+        const j = await API.storyFree(this.ev, this.log.join('\n'), opts, text, ctx);
         UI.loading(false);
         S.lastChoice = 0;
         Game.applyFx(j.fx, 'event');
@@ -233,6 +289,14 @@
       }
     },
 
+    // 当前事件里某个块后面的固定内容（给 API 参考，避免前后矛盾）
+    upcoming(b, n) {
+      const bs = this.ev.blocks, i = bs.indexOf(b);
+      if (i < 0) return '';
+      return bs.slice(i + 1).filter(x => Game.check(x.if) && ['nar', 'say', 'me', 'section'].includes(x.t)).slice(0, n)
+        .map(x => x.t === 'say' ? `${N(x.who)}：${x.ko || ''}（${x.zh || ''}）` : x.t === 'me' ? `玩家：${x.zh || x.text}` : (x.text || '')).join('\n');
+    },
+
     // ---- 自由聊天（序章、第 40 天）----
     async freeChat(b) {
       const S = Game.S;
@@ -243,13 +307,15 @@
       if (!Game.settings().apiKey) { this.show({ t: 'nar', text: '（还没有设置 API，他的回复先跳过。）' }); await this.wait(); return; }
       UI.loading(true, '他在打字…');
       try {
-        const j = await API.chat('he', text);
+        const j = await API.chat('he', text, this.upcoming(b, 12));
         UI.loading(false);
         Game.applyFx(j.delta, 'chat');
         const last = S.chats.he[S.chats.he.length - 1];
         if (last && last.me && j.player_ko) last.ko = j.player_ko;
         for (const r of (j.replies || [])) {
-          const blk = r.type === 'photo' ? { t: 'photo', who: '他', text: r.note } : { t: 'say', who: '他', ko: r.type === 'sticker' ? (CONFIG.STICKERS[r.ko] || {}).ko || r.ko : r.ko, zh: r.zh || r.note || '' };
+          const blk = r.type === 'photo' ? { t: 'photo', who: '他', text: r.note }
+            : r.type === 'voice' ? { t: 'say', who: '他', vtype: 'voice', ko: r.ko, zh: r.zh, note: r.note }
+            : { t: 'say', who: '他', ko: r.type === 'sticker' ? (CONFIG.STICKERS[r.ko] || {}).ko || r.ko : r.ko, zh: r.zh || r.note || '' };
           this.show(blk); this.logLine(blk); await this.wait();
         }
       } catch (e) { UI.loading(false); this.show({ t: 'nar', text: '（API 出错：' + e.message + '）' }); await this.wait(); }

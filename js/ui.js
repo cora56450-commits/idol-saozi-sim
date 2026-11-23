@@ -21,7 +21,7 @@
 
     // ---- 游戏内时钟（分钟）----
     clock() {
-      const m = (Game.S && Game.S.minutes) || 600;
+      const m = (window.Story && Story.ev && Story.storyMin != null) ? Story.storyMin : ((Game.S && Game.S.minutes) || 600);
       return `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
     },
     tick(min) { if (Game.S) Game.S.minutes = Math.min(((Game.S.minutes) || 600) + min, 23 * 60 + 59); },
@@ -45,9 +45,17 @@
     },
 
     // ---- 加载提示 ----
+    // 等 API 时：文字 + 跳动的点点点 + 已经等了几秒
     loading(on, text) {
-      $('#loading').classList.toggle('hidden', !on);
-      if (text) $('#loading span').textContent = text;
+      const el = $('#loading');
+      el.classList.toggle('hidden', !on);
+      clearInterval(this._lt);
+      if (!on) return;
+      const base = (text || el.dataset.base || '加载中').replace(/[.…]+$/, '');
+      el.dataset.base = base;
+      const t0 = Date.now(); let k = 0;
+      const draw = () => { k = (k + 1) % 4; el.querySelector('span').textContent = `${base}${'·'.repeat(k || 1).padEnd(3, '\u2002')}  ${Math.floor((Date.now() - t0) / 1000)} 秒`; };
+      draw(); this._lt = setInterval(draw, 400);
     },
 
     // ---- 手机横幅 ----
@@ -88,8 +96,9 @@
     },
 
     // ---- 弹窗 ----
-    modal(html, onMount) {
+    modal(html, onMount, small) {
       const m = $('#modal');
+      m.classList.toggle('small', !!small);
       $('#modal-inner').innerHTML = html;
       m.classList.remove('hidden');
       $('.modal-close', m).onclick = () => this.closeModal();
@@ -101,7 +110,7 @@
     confirm(text, yes, no) {
       this.modal(`<h2>${esc(text)}</h2><div class="form"><div class="btns">
         <button class="btn-small" data-x="no">${esc(no || '再想想')}</button>
-        <button class="btn-small primary" data-x="yes">${esc(yes || '确定')}</button></div></div>`);
+        <button class="btn-small primary" data-x="yes">${esc(yes || '确定')}</button></div></div>`, null, true);
       return new Promise(res => {
         $('[data-x=yes]').onclick = () => { this.closeModal(); res(true); };
         $('[data-x=no]').onclick = () => { this.closeModal(); res(false); };
@@ -152,7 +161,7 @@
       const html = slots.map(k => {
         const p = Game.peek(k);
         const label = k === 'auto' ? '自动' : k;
-        const info = p ? `<b>第 ${p.day} 天</b><span>${p.role === 'civ' ? '素人线' : '员工线'} · ${esc(p.name)}</span><i>${new Date(p.savedAt).toLocaleString()}</i>` : '<span>空</span>';
+        const info = p ? `<b>第 ${p.day} 天</b><span>${p.role === 'civ' ? '素人线' : '员工线'} · ${esc(p.nameZh || p.name)}</span><i>${new Date(p.savedAt).toLocaleString()}</i>` : '<span>空</span>';
         return `<div class="slot" data-slot="${k}"><div class="num">${label}</div><div class="info">${info}</div></div>`;
       }).join('');
       this.modal(`<h2>${mode === 'save' ? '存档' : '读档'}</h2><div class="slots">${html}</div>`, (root) => {

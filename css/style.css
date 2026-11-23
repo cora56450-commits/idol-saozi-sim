@@ -194,8 +194,17 @@ input, textarea { font-family: inherit; }
 .msg.me .bubble { background: var(--ink); color: #fff; }
 .bubble .zh { display: block; font-size: 12px; color: #8a8580; margin-top: 3px; }
 .msg.me .bubble .zh { color: #bdb8b2; }
-.bubble.voice { display: flex; align-items: center; gap: 8px; }
+.bubble.voice { display: flex; align-items: center; gap: 8px; align-self: flex-start; max-width: 100%; }
+.voice-text { align-self: flex-start; }
 .bubble.voice img { height: 24px; }
+.bubble.voice .wave { display: inline-flex; align-items: center; gap: 2px; height: 18px; }
+.bubble.voice .wave i { display: block; width: 3px; border-radius: 2px; background: currentColor; opacity: .55; height: 40%; }
+.bubble.voice .wave i:nth-child(3n) { height: 90%; } .bubble.voice .wave i:nth-child(4n+1) { height: 65%; } .bubble.voice .wave i:nth-child(5n+2) { height: 25%; }
+.bubble.voice .dur { font-size: 12px; opacity: .75; }
+.voice-text { margin-top: 4px; max-width: 100%; background: #f4f1ed; border: 1px solid #e2ddd7; border-radius: 10px; padding: 7px 10px; font-size: 13px; line-height: 1.5; color: #333; }
+.voice-text .vt-tag { display: block; font-size: 10.5px; color: #9a948e; margin-bottom: 2px; }
+.voice-text .zh { display: block; font-size: 12px; color: #77716b; }
+.voice-text .note { display: block; font-size: 11.5px; color: #9a948e; font-style: italic; margin-top: 2px; }
 .bubble .note { display: block; font-size: 11.5px; color: #9a948e; margin-top: 4px; font-style: italic; }
 .msg .sticker { width: 120px; }
 .msg .read { font-size: 10px; color: var(--red); align-self: flex-end; white-space: nowrap; }
@@ -271,6 +280,10 @@ input, textarea { font-family: inherit; }
 #modal { position: absolute; inset: 0; z-index: 60; }
 .modal-dim { position: absolute; inset: 0; background: rgba(10,10,10,.55); }
 .modal-panel { left: 230px; top: 60px; width: 1140px; height: 780px; }
+#modal.small .modal-panel { left: 500px; top: 290px; width: 600px; height: 320px; }
+#modal.small .modal-close { display: none; }
+#modal.small #modal-inner { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; }
+#modal.small #modal-inner h2 { margin: 0 0 10px; text-align: center; }
 .modal-close { position: absolute; right: 0; top: -58px; z-index: 2; font-size: 16px; padding: 6px 16px; background: var(--ink); color: #fff; }
 .form .row { display: flex; align-items: center; gap: 14px; margin: 12px 0; font-size: 17px; }
 .form .row > span:first-child { width: 160px; flex: none; }
@@ -306,7 +319,7 @@ input, textarea { font-family: inherit; }
 #debug { position: absolute; right: 10px; top: 10px; z-index: 90; background: rgba(0,0,0,.85); color: #fff; font-size: 13px; padding: 10px 14px; line-height: 1.7; font-family: monospace; }
 #debug button { color: #fff; border: 1px solid #fff; padding: 0 6px; margin: 2px; font-size: 12px; }
 #debug input { width: 60px; }
-#loading { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 70; padding: 10px 30px; background: var(--ink); color: #fff; font-size: 16px; border-left: 6px solid var(--red); text-align: center; }
+#loading { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 70; padding: 10px 30px; min-width: 260px; font-variant-numeric: tabular-nums; background: var(--ink); color: #fff; font-size: 16px; border-left: 6px solid var(--red); text-align: center; }
 .choices:empty { display: none; }
 
 /* CG */
@@ -330,3 +343,16 @@ input, textarea { font-family: inherit; }
 #tip-title { margin-bottom: 14px; }
 #tip-text { font-size: 19px; line-height: 1.8; text-align: center; white-space: pre-line; }
 .tip-btn { margin-top: 22px; }
+
+.ig-photo.has-img { background: none; padding: 0; flex-direction: column; align-items: stretch; aspect-ratio: auto; }
+.ig-photo.has-img img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; }
+.ig-photo.has-img .ig-note { display: block; padding: 6px 2px 0; font-size: 11.5px; line-height: 1.5; color: #9a948e; font-style: italic; text-align: left; }
+.setup-panel .name-ko input { flex: 0 0 220px !important; }
+.setup-panel .name-ko small { font-size: 15px; color: #8a847e; }
+.role-pick .btn-choice { opacity: .5; transition: opacity .15s, transform .15s; }
+.role-pick .btn-choice:hover { opacity: .8; }
+.role-pick .btn-choice.sel { opacity: 1; transform: scale(1.02); filter: drop-shadow(0 0 0 #8e1b2a) drop-shadow(0 4px 10px rgba(142,27,42,.35)); }
+.role-pick .btn-choice.sel::after { content: '✓ 已选'; position: absolute; right: 70px; top: 50%; transform: translateY(-50%); font-size: 16px; color: #8e1b2a; font-weight: 700; }
+/* 手机框右下角有一颗星星装饰，底部输入栏往左让开 */
+.app-foot { padding-right: 36px; }
+.story-choices .free { padding-right: 26px; }

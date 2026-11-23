@@ -19,7 +19,7 @@
     return {
       ver: 1,
       role: opts.role || 'civ',          // civ 素人线 / staff 员工线
-      name: opts.name || '지은',
+      name: opts.name || '지은', nameZh: opts.nameZh || opts.name || '智恩',
       sub: opts.sub != null ? opts.sub : (opts.role !== 'staff'),
       day: 1,
       aff: 60, exp: 10, amb: 0,
@@ -42,7 +42,7 @@
   const Game = {
     S: null,
     CHATS,
-    newGame(opts) { this.S = fresh(opts); return this.S; },
+    newGame(opts) { this.S = fresh(opts); const f = (CONFIG.FACTS_START || {})[this.S.role]; this.S.facts = f ? [f] : []; return this.S; },
 
     // 数值变化：source = 'event' 不受每日上限；'chat' 受上限（感情 ±8 / 曝光 ±6）
     applyFx(fx, source) {
@@ -79,6 +79,14 @@
       return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}（${wk}）`;
     },
 
+    // 一直有效的事实（见 CONFIG.EVENT_FACTS）
+    addFact(key) {
+      const S = this.S; let f = (CONFIG.EVENT_FACTS || {})[key];
+      if (f && typeof f === 'object') f = f[S.role];
+      if (!f) return;
+      S.facts = S.facts || [];
+      if (!S.facts.includes(f)) S.facts.push(f);
+    },
     remember(text) {
       const S = this.S;
       S.recent.push(`第${S.day}天：${text}`);
@@ -115,7 +123,15 @@
     load(slot) {
       const raw = localStorage.getItem(SAVE_PREFIX + slot);
       if (!raw) return false;
-      this.S = JSON.parse(raw); return true;
+      this.S = JSON.parse(raw);
+      // 旧存档补字段
+      const S = this.S;
+      if (!S.nameZh) S.nameZh = S.name;
+      if (!S.facts) {
+        const f = (CONFIG.FACTS_START || {})[S.role]; S.facts = f ? [f] : [];
+        Object.keys(S.seen || {}).forEach(id => this.addFact(id));
+      }
+      return true;
     },
     peek(slot) {
       const raw = localStorage.getItem(SAVE_PREFIX + slot);

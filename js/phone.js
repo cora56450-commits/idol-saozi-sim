@@ -1,5 +1,22 @@
 // 手机：主屏、TOKTOK、BLINK、더쿠판、InstaSnap，以及手机事件的播放界面
 (function () {
+
+  function voiceHTML(m) {
+    let ko = m.ko || '', zh = m.zh || '', note = m.note || '';
+    // 旧格式：ko 写成 [음성 0:09]，内容在 note 里
+    const old = /^\s*\[(음성|语音)/.test(ko);
+    let dur = (ko.match(/\d+:\d{2}/) || note.match(/\d+:\d{2}/) || [])[0];
+    if (old) { ko = ''; zh = ''; }
+    note = note.replace(/^\s*\d+:\d{2}\s*[｜|]?\s*/, '');
+    if (!dur) { const s = Math.max(2, Math.min(59, Math.round((ko || zh || note).length / 3))); dur = '0:' + String(s).padStart(2, '0'); }
+    let tr = '';
+    if (ko || zh) tr = `${esc(ko)}${zh ? `<span class="zh">${esc(zh)}</span>` : ''}${note ? `<span class="note">${esc(note)}</span>` : ''}`;
+    else if (note) tr = esc(note);
+    const sec = (+dur.split(':')[0]) * 60 + (+dur.split(':')[1]);
+    const w = Math.round(110 + Math.min(60, sec) * 2.2);
+    return `<div class="bubble voice" style="width:${w}px"><img src="assets/ui/ic_voice.png" alt=""><span class="dur">${dur}</span></div>` +
+      (tr ? `<div class="voice-text"><span class="vt-tag">转文字</span>${tr}</div>` : '');
+  }
   const { $, $$, esc } = UI;
   const scr = () => $('#phone-screen');
   const N = (who) => (CONFIG.NAMES[who] || who);
@@ -13,6 +30,26 @@
   function avatarHTML(key, label) {
     const ch = esc((label || '?').slice(0, 1));
     return AVAIL[key] ? `<div class="avatar"><img src="${AVAIL[key]}" alt=""></div>` : `<div class="avatar">${ch}</div>`;
+  }
+  // InstaSnap：给动态挑配图和头像
+  function igAvatarKey(p) {
+    const s = `${p.account || ''} ${p.display_name || ''}`;
+    const r = (CONFIG.INSTA_AVATAR || []).find(([re]) => new RegExp(re, 'i').test(s));
+    return r ? r[1] : 'ig';
+  }
+  function igPhoto(p, seed) {
+    if (p._img !== undefined) return p._img;
+    const s = `${p.account || ''} ${p.display_name || ''}`, note = p.note || '';
+    let best = null, bestScore = 0;
+    (CONFIG.INSTA_PHOTOS || []).forEach((c, k) => {
+      const own = c.who !== '.' && new RegExp(c.who, 'i').test(s);
+      if (c.who !== '.' && !own) return;
+      const hits = note.split('').length ? (c.tags.split('|').filter(w => note.includes(w)).length) : 0;
+      const score = (own ? 2 : 0) + hits * 3 + ((seed + k) % 7) / 10;
+      if ((own || hits) && score > bestScore) { best = c.img; bestScore = score; }
+    });
+    p._img = best || '';
+    return p._img;
   }
   const speakerKey = { '弟弟': 'brother', '他': 'he', '徐允在': 'he', '东旻': 'dongmin', '韩东旻': 'dongmin', '柳时元': 'siwon', '郑书娟': 'friend', '宋恩智': 'eunji' };
   const statusBar = (light) => `<div class="status-bar ${light ? 'light' : ''}"><span>${UI.clock()}</span><span>LTE ▮▮▮ 82%</span></div>`;
@@ -94,6 +131,7 @@
     },
 
     msgHTML(m, chatId) {
+      // 语音：显示时长条 + 下面直接转成文字
       if (m.sep) return `<div class="day-sep">${esc(m.sep)}</div>`;
       const me = !!m.me;
       let inner;
@@ -103,7 +141,7 @@
       } else if (m.type === 'photo') {
         inner = `<div class="photo-card">${esc(m.note || '（照片）')}</div>`;
       } else if (m.type === 'voice') {
-        inner = `<div class="bubble voice"><img src="assets/ui/ic_voice.png" alt=""><span>${esc(m.ko || '')}</span></div>${m.note ? `<div class="bubble"><span class="note">${esc(m.note)}</span></div>` : ''}`;
+        inner = voiceHTML(m);
       } else if (me) {
         inner = `<div class="bubble">${m.ko ? esc(m.ko) + `<span class="zh">${esc(m.zh)}</span>` : esc(m.zh)}</div>`;
       } else {
@@ -257,8 +295,10 @@
       }
       const cards = [];
       for (const [d, f] of this.feedsRecent(3)) (f.instasnap || []).forEach((p, i) => cards.push(`<div class="ig-card">
-        <div class="ig-top">${avatarHTML('ig', p.display_name || p.account)}<div><div class="acc">${esc(p.account)}</div><div class="dn">${esc(p.display_name || '')}</div></div></div>
-        <div class="ig-photo">${esc(p.note || '')}</div>
+        <div class="ig-top">${avatarHTML(igAvatarKey(p), (p.display_name || p.account || '').replace(/^@/, ''))}<div><div class="acc">${esc(p.account)}</div><div class="dn">${esc(p.display_name || '')}</div></div></div>
+        ${(() => { const im = igPhoto(p, d * 7 + i); return im
+          ? `<div class="ig-photo has-img"><img src="assets/insta/${im}.jpg" alt="" onerror="this.parentNode.classList.remove('has-img');this.remove()"><span class="ig-note">${esc(p.note || '')}</span></div>`
+          : `<div class="ig-photo">${esc(p.note || '')}</div>`; })()}
         <div class="ig-acts"><img src="assets/ui/ic_heart.png" alt=""><img src="assets/ui/ic_comment.png" alt=""><span>${(p.likes || 0).toLocaleString()}</span></div>
         <div class="ig-cap">${esc(p.caption_ko)}<span class="zh">${esc(p.caption_zh)}</span></div>
         <div class="ig-cmts">${(p.comments || []).map(c => `<div class="cmt ${c.mine ? 'mine' : ''}"><b>${esc(c.account)}</b> ${esc(c.ko)}<span class="zh">${esc(c.zh)}</span></div>`).join('')}</div>
@@ -368,7 +408,7 @@
       if (b.t === 'me') return this.storyAppend(this.msgHTML({ me: true, zh: b.zh }, 'he'));
       if (b.t === 'photo') return this.storyAppend(this.msgHTML({ type: 'photo', note: b.text, speaker: b.who }, 'he'));
       if (b.who === '论坛') return this.storyAppend(`<div class="cmt" style="background:#fff;padding:8px 12px;border:1px solid #e2ddd7"><div class="who">${b.manner === '标题' ? '<b>더쿠판 · 帖子</b>' : '무명의 판러'}</div>${esc(b.ko)}<span class="zh">${esc(b.zh)}</span></div>`);
-      const m = { ko: b.ko, zh: b.zh, speaker: b.who };
+      const m = { ko: b.ko, zh: b.zh, speaker: b.who, type: b.vtype, note: b.note };
       const html = this.msgHTML(m, b.who === '他' ? 'he' : 'group');
       this.storyAppend(b.ch === 'bubble' ? html.replace('<div class="col">', '<div class="col"><div class="who">BLINK</div>') : html);
     },

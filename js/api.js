@@ -50,8 +50,10 @@
     throw new Error('BAD_JSON');
   }
 
+  // 玩家名：韩文名（中文写法），对话里用韩文名
+  const pname = () => { const S = Game.S; return S.nameZh && S.nameZh !== S.name ? `${S.name}（中文写作 ${S.nameZh}，韩文台词里一律用 ${S.name}）` : S.name; };
   function common() {
-    return PROMPTS.common.replace(/\{player_name\}/g, Game.S.name);
+    return PROMPTS.common.replace(/\{player_name\}/g, pname());
   }
   function examples(arr) {
     return arr.map((e, i) => `【样例 ${i + 1}】\n${e}`).join('\n\n');
@@ -62,7 +64,7 @@
     const ev = EVENTS['day' + S.day];
     return `【当前状态】
 第 ${S.day} 天 / 日期 ${Game.dateStr(S.day)} / 阶段：${SCHEDULE.phaseOf(S.day)}
-玩家身份：${S.role === 'civ' ? '素人线' : '员工线'}；玩家名：${S.name}
+玩家身份：${S.role === 'civ' ? '素人线' : '员工线'}；玩家名：${pname()}
 泡泡订阅：${S.sub ? '是' : '否'}
 感情值档位：${Game.affTier()}
 曝光值档位：${Game.expTier()}
@@ -72,6 +74,8 @@
 今天的固定事件：${ev ? ev.title : '无'}
 今天他的行程：${SCHEDULE.todayPlan(S.day)}
 现在时间：${UI.clock()}
+一直有效的事（不要和这些矛盾）：
+${(S.facts || []).map(f => '- ' + f).join('\n') || '- （无）'}
 最近发生的事：
 ${S.recent.slice(-8).map(r => '- ' + r).join('\n') || '- （刚开始）'}
 ${extra || ''}`;
@@ -79,11 +83,17 @@ ${extra || ''}`;
 
   function transcript(chatId, n) {
     const msgs = Game.S.chats[chatId].slice(-(n || 16));
-    return msgs.map(m => {
+    // 按天分段，让 AI 知道哪些话是哪天说的（避免把三天前的事说成「早上」）
+    const today = Game.S.day; let lastDay = null; const out = [];
+    msgs.forEach(m => {
+      if (m.sep) return;
+      const d = m.day || null;
+      if (d && d !== lastDay) { out.push(d === today ? '—— 今天 ——' : `—— 第 ${d} 天（${today - d} 天前）——`); lastDay = d; }
       const who = m.me ? '玩家' : (m.speaker || Game.CHATS[chatId].who);
-      const txt = m.type === 'sticker' ? `[表情:${m.sticker}]` : (m.ko ? `${m.ko}（${m.zh || ''}）` : m.zh);
-      return `${who}：${txt}`;
-    }).join('\n');
+      const txt = m.type === 'sticker' ? `[表情:${m.sticker}]` : m.type === 'voice' ? `[语音] ${m.ko || ''}（${m.zh || m.note || ''}）` : m.type === 'photo' ? `[照片] ${m.note || ''}` : (m.ko ? `${m.ko}（${m.zh || ''}）` : m.zh);
+      out.push(`${who}：${txt}`);
+    });
+    return out.join('\n');
   }
 
   const STICKER_RULE = `\n\n表情包：type 为 "sticker" 时，ko 字段只能写这些 id 之一：${Object.keys(CONFIG.STICKERS).join(' / ')}（hungry=배고파, manager=실장 미워, bento=도시락!!, hmph=흥, sleepy=졸려, scared=무서워, noona=누나, miss=보고싶다）。不要太频繁，平均三四轮才发一次。`;
@@ -91,7 +101,7 @@ ${extra || ''}`;
   const API = {
     stripJSON,
     test() { return rawCall('Reply with the single word OK.', 'ping', 20); },
-    async chat(chatId, playerText) {
+    async chat(chatId, playerText, storyCtx) {
       const S = Game.S;
       let sys, fmt, ex;
       if (chatId === 'he') {
@@ -107,7 +117,8 @@ ${extra || ''}`;
         fmt = PROMPTS.chatOtherFormat; ex = PROMPTS.chatOtherEx;
       }
       sys += `\n\n输出格式：\n${fmt}\n\n${examples(ex)}`;
-      const user = stateBlock() + `\n【聊天记录（最近）】\n${transcript(chatId) || '（还没有聊过）'}\n\n【玩家刚发来的话（中文原话）】\n${playerText}`;
+      const user = stateBlock() + `\n【聊天记录（最近）】\n${transcript(chatId) || '（还没有聊过）'}\n\n【玩家刚发来的话（中文原话）】\n${playerText}`
+        + (storyCtx ? `\n\n【这段聊天发生在固定剧情中间。你的回复之后剧情会这样接下去，不要和它矛盾，也不要提前说出后面的内容，只回应玩家这一句，3～5 条以内】\n${storyCtx}` : '');
       return callJSON(sys, user, 1500);
     },
 
@@ -137,7 +148,8 @@ ${extra || ''}`;
     },
 
     // 固定事件选项里的「自己说……」
-    async storyFree(ev, before, options, playerText) {
+    async storyFree(ev, before, options, playerText, ctx) {
+      ctx = ctx || {};
       const lim = { aff: 0, exp: 0, amb: 0 };
       options.forEach(o => Object.keys(lim).forEach(k => { lim[k] = Math.max(lim[k], Math.abs((o.fx || {})[k] || 0)); }));
       const sys = common() + `\n\n现在是固定剧情事件「${ev.title}」里的一个选择点。玩家没有选固定选项，而是自己说了一句话（中文原话）。
@@ -146,8 +158,11 @@ ${extra || ''}`;
 如果玩家的话等于完成了某个固定选项的关键做法（例如说出具体哪首歌哪一句唱得好），就在 flags 里写和那个选项一样的标记。
 只输出 JSON：
 {"player_ko":"","lines":[{"t":"nar","text":""},{"t":"say","who":"他","ko":"","zh":""}],"fx":{"aff":0,"exp":0,"amb":0},"flags":[]}`;
-      const opts = options.map((o, i) => `选项${i + 1}「${o.label}」${JSON.stringify(o.fx)} 标记:${(o.flags || []).join(',') || '无'}\n后续示例：${o.after.slice(0, 6).map(b => b.text || ((b.who || '') + '：' + (b.ko || '') + '（' + (b.zh || '') + '）')).join(' / ')}`).join('\n');
-      const user = stateBlock() + `\n【事件到目前为止】\n${before}\n\n【固定选项】\n${opts}\n\n【玩家自己说的话】\n${playerText}`;
+      const opts = options.map((o, i) => `选项${i + 1}「${o.label}」${JSON.stringify(o.fx)} 标记:${(o.flags || []).join(',') || '无'}\n后续示例：${o.after.slice(0, ctx.isLast ? 14 : 6).map(b => b.text || ((b.who || '') + '：' + (b.ko || '') + '（' + (b.zh || '') + '）')).join(' / ')}`).join('\n');
+      const tail = ctx.isLast
+        ? `\n\n【这是这一场的最后一个选择】后续要把这一场完整收尾（写到这次见面 / 这一晚怎么结束，比如他什么时候走、最后一句话），写 8–14 行，长度和收尾方式参考固定选项的后续。`
+        : (ctx.next ? `\n\n【你写完以后，剧情会这样接下去】（不要和它矛盾，也不要提前写出来）\n${ctx.next}` : '');
+      const user = stateBlock() + `\n【事件到目前为止】\n${before}\n\n【固定选项】\n${opts}\n\n【玩家自己说的话】\n${playerText}` + tail;
       const j = await callJSON(sys, user, 1500);
       j.fx = j.fx || {};
       Object.keys(lim).forEach(k => { j.fx[k] = Math.max(-lim[k], Math.min(lim[k], j.fx[k] || 0)); });

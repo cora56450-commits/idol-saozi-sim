@@ -77,8 +77,33 @@ window.CONFIG = {
   AVATARS: {
     he: 'assets/avatar/yunjae.png', dongmin: 'assets/avatar/dongmin.png', siwon: 'assets/avatar/siwon.png',
     friend: 'assets/avatar/seoyeon.png', eunji: 'assets/avatar/eunji.png', group: 'assets/avatar/group.png',
-    work: 'assets/avatar/work.png', brother: 'assets/avatar/brother.png'
+    work: 'assets/avatar/work.png', brother: 'assets/avatar/brother.png', moon: 'assets/avatar/moon.png'
   },
+  // InstaSnap 上的账号头像：按账号名 / 昵称匹配到上面的头像
+  INSTA_AVATAR: [['윤재|允在|yoonjae|yunjae', 'he'], ['동민|东旻|dongmin', 'dongmin'], ['시원|时元|siwon', 'siwon'],
+    ['달빛|moon\\.collector', 'moon'], ['서연|书娟|seoyeon|seo\\.', 'friend'], ['은지|恩智|eunji', 'eunji']],
+
+  // InstaSnap 配图（assets/insta/<img>.jpg）：who 匹配账号/昵称，tags 匹配照片描述，挑最贴的一张；没有合适的就只显示文字
+  INSTA_PHOTOS: [
+    { img: 'ig_01', who: '윤재|允在|yoonjae|yunjae', tags: '自拍|镜子|练习室|口罩' },
+    { img: 'ig_02', who: '윤재|允在|yoonjae|yunjae', tags: '窗|咖啡|阳光|精修|侧脸|杯' },
+    { img: 'ig_03', who: '윤재|允在|yoonjae|yunjae', tags: '胶片|相机|手|夜|街' },
+    { img: 'ig_04', who: '동민|东旻|dongmin', tags: '丑照|睡|车|保姆车|允在' },
+    { img: 'ig_05', who: '동민|东旻|dongmin', tags: '吃|炸鸡|辣炒年糕|宿舍|游戏|手柄|外卖' },
+    { img: 'ig_06', who: '동민|东旻|dongmin', tags: '自拍|后台|妆|待机室|比耶' },
+    { img: 'ig_07', who: '준호|俊浩|junho', tags: '作曲|工作室|键盘|咖啡|屏幕|美式' },
+    { img: 'ig_08', who: '시원|时元|siwon', tags: '天花板|练习室|灯' },
+    { img: 'ig_09', who: '시원|时元|siwon', tags: '天空|夜|桥|路灯|汉江|云' },
+    { img: 'ig_10', who: 'lumiere|루미에르', tags: '合照|后台|四个人|成员|打歌|舞台服' },
+    { img: 'ig_11', who: 'lumiere|루미에르', tags: '预告|海报|行程|回归|teaser|日程' },
+    { img: 'ig_12', who: '달빛|moon|站姐|fansite|master', tags: '下班|上班|出勤|退勤|口罩|挥手|路' },
+    { img: 'ig_13', who: '달빛|moon|站姐|fansite|master', tags: '舞台|红|灯|唱|耳返|直拍' },
+    { img: 'ig_14', who: '은채|恩彩|eunchae', tags: '剧组|剧本|片场|自拍|拍摄' },
+    { img: 'ig_15', who: '서연|书娟|seoyeon', tags: '猫|办公|键盘|下班|日常' },
+    { img: 'ig_16', who: '은지|恩智|eunji', tags: '咖啡|美式|工牌|公司|办公桌' },
+    { img: 'ig_17', who: '.', tags: '应援|手灯|小卡|专辑|周边|应援棒' },
+    { img: 'ig_18', who: '.', tags: '目击|偶遇|咖啡店|汉南|模糊|远处|帽子|街' }
+  ],
 
   // 结局 CG（assets/cg/）
   ENDING_CG: {
@@ -87,17 +112,37 @@ window.CONFIG = {
   },
 
   // 事件 CG：match = 播到含有这段文字的那一行时出现；'事件id#选项序号' = 选了那个选项后出现
-  // role 可选，只在某条身份线出现。文件在 assets/cg/<img>.jpg，缩略图 <img>_s.jpg
+  // role 可选，只在某条身份线出现；end 可选，播到含有这段文字的行时 CG 收起（可以用 | 隔开写几种）。文件在 assets/cg/<img>.jpg，缩略图 <img>_s.jpg
   EVENT_CG: [
-    { ev: 'day1', match: '闪回', role: 'civ', img: 'ev_day1', name: '序章 · 第一次来取餐' },
-    { ev: 'day7', match: '猫眼里的人戴着黑色棒球帽', img: 'ev_day7', name: '第 7 天 · 猫眼' },
-    { ev: 'day25', match: '你把专辑推过去', img: 'ev_day25', name: '第 25 天 · 签售会' },
+    { ev: 'day1', role: 'civ', img: 'ev_day1', name: '序章 · 第一次来取餐' },
+    { ev: 'day7', match: '猫眼里的人戴着黑色棒球帽', end: '你开了门', img: 'ev_day7', name: '第 7 天 · 猫眼' },
+    { ev: 'day25', match: '你把专辑推过去', end: '那天之后|当晚|走出唱片店|回到家', img: 'ev_day25', name: '第 25 天 · 签售会' },
     { ev: 'day52', choice: 1, img: 'ev_day52_1', name: '第 52 天 · 汉江车里' },
     { ev: 'day52', choice: 3, img: 'ev_day52_3', name: '第 52 天 · 凌晨东海' },
     { ev: 'day62', choice: 2, img: 'ev_day62', name: '第 62 天 · 停车场蛋糕' },
-    { ev: 'day78', match: '他下台的时候经过你身边', img: 'ev_day78', name: '第 78 天 · 后台' },
+    { ev: 'day78', match: '他下台的时候经过你身边', end: '你不确定', img: 'ev_day78', name: '第 78 天 · 后台' },
     { ev: 'day84', choice: 1, img: 'ev_day84_1', name: '第 84 天 · 圣诞' }
   ],
+
+  // 一直有效的事实：开局按身份写入；事件结束后（'dayN'）或选了某个选项后（'dayN#选项序号'）写入。
+  // 每次调用 API 都会带上，避免 AI 前后矛盾。可以是字符串，或 {civ, staff} 分身份
+  FACTS_START: {
+    civ: '她在弘大开一家小小的减脂便当工作室（只有她和一个兼职）；以前是他的粉丝，手机里还留着粉丝小号',
+    staff: '她是公司签约的艺人营养师，负责几个团回归期的饮食，能进练习室和后台；公司里没有人知道他们在交往；她入职前也是粉丝，留着一个粉丝小号'
+  },
+  EVENT_FACTS: {
+    'day3': { civ: '第 3 天起，LUMIÈRE 回归期的便当由她的工作室供应（公司经纪组连订六周），他每天中午吃的就是她做的便当',
+              staff: '第 3 天她给团员发了回归期饮食表：禁止夜宵、含糖饮料、油炸食品（包括炸鸡）；他每天吃的是她配的餐' },
+    'day3#1': '她坚持便当里西兰花照放，他嘴上抱怨，西兰花常偷偷拨给东旻',
+    'day3#2': '约定：每周五晚上他可以自己选一顿自由餐（炸鸡最多三块）；每周四晚上十一点他都会发「내일 금요일이다」（明天是周五了）',
+    'day3#3': '她把他那份便当里的西兰花偷偷换成了芦笋，东旻已经发现「只有哥的不一样」',
+    'day12': '东旻知道他们在交往，是团里唯一知情的人；从这天起有了三人群（允在、东旻、玩家）',
+    'day48': '第 48 天起他进剧组拍网剧，和女演员姜恩彩搭档，要拍两个月',
+    'day62#2': '他生日那天，她亲手做了一个低糖蛋糕送过去'
+  },
+
+  // 剧情开始时手机上的时间（分钟数，01:40 = 100）；剧情里旁白提到时间会自动更新
+  EVENT_TIME: { day1: 100 },
 
   // 音乐（assets/bgm/）：theme 主题/日常，date 约会/开心，sweet 线下甜蜜，tense 曝光/紧张，sad 悲伤/追忆
   BGM_EVENT: {
@@ -134,13 +179,26 @@ window.SCHEDULE = {
   },
   todayPlan(day) {
     const p = this.phaseOf(day);
+    if (day === 16) return '回归日：下午 6 点新歌音源发布，晚上 8 点线上 Showcase 直播';
     const pick = (arr) => arr[day % arr.length];
-    if (p === '回归准备') return pick([
-      '上午录音，下午到晚上全员合练，凌晨收工',
-      '拍 MV，从早上六点拍到深夜',
+    // 回归准备期按天写死，一步步走到第 16 天回归（MV 只在第 1 天拍）
+    if (p === '回归准备') return [
+      '拍 MV，从早上六点拍到第二天凌晨',
       '拍概念照，中午有一个杂志采访，晚上练舞',
-      '舞蹈合练一整天，晚上声乐课'
-    ]);
+      '上午开会（营养师讲回归期饮食计划），下午到晚上全员合练',
+      '上午录音棚补录副歌，下午到晚上合练，凌晨收工',
+      '舞蹈合练一整天，晚上声乐课',
+      '拍回归预告 teaser 短片，晚上合练',
+      '上午练舞，下午难得空出半天',
+      '录团综（回归特辑），晚上合练',
+      '合练一整天，晚上开回归预热 V LIVE',
+      '音源最终确认，下午舞台走位彩排',
+      '打歌服试装，晚上合练到凌晨',
+      '音乐节目预录走位彩排，晚上录团综',
+      '全员合练，凌晨收工',
+      '回归 Showcase 彩排一整天',
+      '回归前一天：Showcase 最终彩排，晚上说要早睡（其实睡不着）'
+    ][day - 1];
     if (p === '回归打歌期') return pick([
       '音乐节目打歌：早上预录，下午 3 点彩排，晚上 6 点直播（无观众）',
       '音乐节目打歌，结束后去录综艺，凌晨收工',
