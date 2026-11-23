@@ -61,7 +61,7 @@ async def main():
             await pg.wait_for_timeout(60)
         await pg.wait_for_timeout(500)
         await pg.screenshot(path=SH+'d_desk3.png')
-        print(await pg.evaluate("JSON.stringify({t:UI.clock(),aff:Game.S.aff,exp:Game.S.exp,dates:Game.S.dates,recent:Game.S.recent.slice(-3),shop:Game.S.chats.shop.length})"))
+        print(await pg.evaluate("JSON.stringify({t:UI.clock(),aff:Game.S.aff,exp:Game.S.exp,dates:Game.S.dates,recent:Game.S.recent.slice(-3),shop:Game.S.chats.shop.length,friend:Game.S.chats.friend.length,unread:Game.S.unread})"))
         import collections; print('calls', collections.Counter(calls), calls[:30])
         print('errors', errs[:8]); await b.close()
 asyncio.run(main())

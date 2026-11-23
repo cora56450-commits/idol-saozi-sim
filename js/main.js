@@ -123,6 +123,7 @@
       Game.autosave();
       if (!S.feeds[S.day]) await this.genFeed();
       if (!ev && Game.settings().apiKey && S.day > 1) this.morningPing();
+      if (Game.settings().apiKey && S.day > 1 && Math.random() < 0.6) this.ambient([S.minutes, '早上'], S.day);
       UI.updateBadge();
     },
 
@@ -218,8 +219,31 @@
       // 行程间隙他可能会来找你；开店时店里的群会有人说话
       if (!Game.settings().apiKey) return;
       const day = S.day;
-      if (/去店里/.test(nx[1]) && Math.random() < 0.7) this.ping('shop', '早上开店，白秀珍或吴叡琳在工作群里说今天的订单、备菜、配送的事（她们先到店里了）。', day);
-      else if (Math.random() < 0.5) this.ping('he', `现在 ${UI.clock()}（她：${Game.workStatus()}）。他在行程间隙或收工以后主动找她，聊今天行程里的幕后小事（今天的行程：${SCHEDULE.todayPlan(day)}）。`, day);
+      if (Math.random() < 0.5) this.ping('he', `现在 ${UI.clock()}（她：${Game.workStatus()}）。他在行程间隙或收工以后主动找她，聊今天行程里的幕后小事（今天的行程：${SCHEDULE.todayPlan(day)}）。`, day);
+      this.ambient(nx, day);
+    },
+    // 其他人自己也会发消息：闺蜜、店里的群、三人群、弟弟……每次往后过挑一两个
+    ambient(nx, day) {
+      const S = Game.S, h = Math.floor((S.minutes % 1440) / 60), now = UI.clock(), st = Game.workStatus();
+      const working = /上班/.test(st), list = Game.availableChats();
+      const pool = [];
+      const add = (id, w, why) => { if (list.includes(id)) pool.push({ id, w, why }); };
+      if (S.role === 'civ') {
+        add('shop', /去店里/.test(nx[1]) ? 6 : working ? 3 : 0.5, working
+          ? `现在 ${now}，店里营业中。白秀珍或吴叡琳在工作群里说店里的事：订单、备菜、食材不够、配送跑到哪、客人的奇怪要求、叡琳上课迟到之类。`
+          : `现在 ${now}，店已经关了。白秀珍或吴叡琳在工作群里随口说点下班后的事，或者提醒明天的订单。`);
+        add('friend', 3, `现在 ${now}（她：${st}）。闺蜜郑书娟主动找她闲聊：吐槽自己公司和上司、分享八卦或好笑的事、约周末、追问她和允在最近怎么样。要像真闺蜜，不用每次都绕到恋爱上。`);
+      } else {
+        add('work', working ? 4 : 0.5, `现在 ${now}。公司工作群里室长或宣传部发公事：明天行程变动、团员饮食问题、会议时间、偶尔有人发错消息。`);
+        add('eunji', working ? 3 : 1, `现在 ${now}（她：${st}）。宋恩智主动来八卦：茶水间听到的艺人传闻、约下午茶、打听她最近在忙什么。`);
+      }
+      add('group', 3, `现在 ${now}。三人群里东旻先说话（转发论坛帖、吐槽允在、报告练习室发生的事），允在有空也会插一两句。`);
+      add('dongmin', 1, `现在 ${now}。东旻单独私聊她：求她帮忙、问恋爱建议、吐槽允在，或者为自己追的女团练习生的事求助。`);
+      if (h >= 18 && h < 22) add('brother', 2.5, `现在 ${now}，他刚从部队拿到手机。主动找姐姐聊：吐槽部队伙食、班长、站岗，或者跟她要东西。`);
+      if (S.amb >= 20) add('siwon', h >= 22 || h < 3 ? 2 : 0.5, `现在 ${now}。柳时元很克制地主动发一两句消息（练习结束、看到某样东西想起她）。`);
+      const pick = () => { const tot = pool.reduce((a, x) => a + x.w, 0); let r = Math.random() * tot; for (let k = 0; k < pool.length; k++) { r -= pool[k].w; if (r <= 0) return pool.splice(k, 1)[0]; } return null; };
+      const n = Math.random() < 0.35 ? 2 : 1; // 一次一两个人
+      for (let k = 0; k < n && pool.length; k++) { const x = pick(); if (x && x.w > 0) setTimeout(() => this.ping(x.id, x.why, day), 1500 + k * 4000); }
     },
     async ping(id, reason, day) {
       try {
