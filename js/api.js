@@ -197,7 +197,7 @@ ${extra || ''}`;
     async dateTurn(phase, date, history, playerText) {
       const sys = common() + '\n\n' + PROMPTS.date + `\n\n输出格式：\n${PROMPTS.dateFormat}`;
       const who = date.who || '他', cid = { '他': 'he', '郑书娟': 'friend', '东旻': 'dongmin', '柳时元': 'siwon', '宋恩智': 'eunji', '白秀珍': 'shop' }[who] || 'he';
-      const user = stateBlock() + `\n【这次见面的人】${who === '他' ? '徐允在' : Game.whoName(who)}\n【这次见面】${date.place || '她家'}，约的是 ${date.time}（${date.what || ''}）；现在 ${UI.clock()}\n【和这个人最近的聊天】\n${transcript(cid, 14) || '（无）'}\n\n【这次见面到目前为止】\n${history || '（刚开始）'}\n\nphase：${phase}` + (playerText ? `\n【玩家这一轮说的话（中文原话）】\n${playerText}` : '');
+      const user = stateBlock() + `\n【这次见面的人】${who === '他' ? '徐允在' : Game.whoName(who)}\n【这次见面】${date.place || '她家'}，约的是 ${date.time}（${date.what || ''}）；现在 ${UI.clock()}\n${(Game.S.dateLog || []).filter(x => x.who === who).length ? '【之前几次见面（做过的事、说过的话别重复）】\n' + Game.S.dateLog.filter(x => x.who === who).slice(-3).map(x => `第${x.day}天：${x.sum}`).join('\n') + '\n' : ''}【和这个人最近的聊天】\n${transcript(cid, 14) || '（无）'}\n\n【这次见面到目前为止】\n${history || '（刚开始）'}\n\nphase：${phase}` + (playerText ? `\n【玩家这一轮说的话（中文原话）】\n${playerText}` : '');
       const j = await callJSON(sys, user, 1400);
       j.fx = j.fx || {};
       j.fx.aff = Math.max(-3, Math.min(3, +j.fx.aff || 0)); j.fx.exp = Math.max(0, Math.min(2, +j.fx.exp || 0)); j.fx.amb = Math.max(-3, Math.min(3, +j.fx.amb || 0));

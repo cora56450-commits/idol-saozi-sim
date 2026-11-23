@@ -330,6 +330,10 @@
       if (j && j.lines && j.lines.length) { aff += j.fx.aff; amb += j.fx.amb; for (const l of j.lines) await say(l); }
       else if (isHe) for (const l of [{ t: 'say', ko: '나 간다. 문 잠그고 자', zh: '我走了。锁好门睡觉' }, { t: 'nar', text: '门关上以后，楼道里的声控灯亮了一会儿，又灭了。' }]) await say(l);
       else await say({ t: 'nar', text: '你们在路口分开，各自回家。' });
+      // 记一笔这次见面做了什么（旁白摘要），下次见面别重复
+      S.dateLog = S.dateLog || [];
+      S.dateLog.push({ day: S.day, who, sum: Story.log.filter(l => !/^玩家：/.test(l)).map(l => l.replace(/：[^（]*（([^）]*)）$/, '：$1')).join(' ').replace(/\s+/g, ' ').slice(0, 240) });
+      if (S.dateLog.length > 8) S.dateLog = S.dateLog.slice(-8);
       if (isHe) {
         // 见面：感情 +2，曝光 +1（在外面 +3）；聊天里的加减压在 ±6 / 4 以内
         aff = Math.max(-6, Math.min(6, aff)) + 2; exp = Math.min(4, exp) + (/家/.test(d.place) ? 1 : 3);
