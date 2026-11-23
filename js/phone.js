@@ -81,10 +81,10 @@
       if (window.Main && Main.checkDate) Main.checkDate(); // 聊着聊着到了约好的时间：放下手机他就到了
     },
 
-    go(view, arg) {
+    go(view, arg, quiet) { // quiet：只是刷新当前画面（来了新消息），不走时间、不弹提示
       this.view = view; this.arg = arg;
       const S = Game.S;
-      UI.tick(1);
+      if (!quiet) UI.tick(1);
       const html = {
         home: () => this.home(),
         toktok: () => this.chatList(),
@@ -107,7 +107,7 @@
       if (view === 'blink') S.unread.blink = 0;
       if (view === 'pan') S.unread.pan = 0;
       if (view === 'insta') S.unread.insta = 0;
-      UI.tip({ home: 'home', chat: 'chat', blink: 'blink', pan: 'pan', insta: 'insta' }[view]);
+      if (!quiet) UI.tip({ home: 'home', chat: 'chat', blink: 'blink', pan: 'pan', insta: 'insta' }[view]);
     },
 
     unreadTotal() {
@@ -178,7 +178,8 @@
         out += this.msgHTML(m, id);
       });
       out = `<div class="chat-intro">${esc(c.desc || '')}</div>` + (out || `<div class="empty-tip">还没有消息</div>`);
-      return `<div class="app toktok">${statusBar(true)}${head(c.name, '', 'toktok')}<div class="app-body"><div class="msgs" id="msgs">${out}</div></div>
+      const others = Object.keys(Game.CHATS).some(k => k !== id && (S.unread[k] || 0) > 0); // 别人有未读：返回键上亮小红点
+      return `<div class="app toktok">${statusBar(true)}${head(c.name, '', 'toktok').replace('</button>', others ? '<i class="dot"></i></button>' : '</button>')}<div class="app-body"><div class="msgs" id="msgs">${out}</div></div>
         <div class="app-foot"><textarea id="chat-in" placeholder="打中文，发出去会变成韩文"></textarea><button class="send" id="chat-send"><img src="assets/ui/ic_send.png" alt=""></button></div></div>`;
     },
 
@@ -314,7 +315,15 @@
       }
       S.unread[id] = (S.unread[id] || 0) + replies.length;
       const first = replies[0];
-      if (first && !Story.ev) UI.notify('toktok', Game.CHATS[id].name, first.type === 'sticker' ? '[表情]' : (first.ko || '[消息]'), () => { this.open('home'); this.go('chat', id); });
+      if (this.isOpen() && !Story.ev) {
+        // 手机开着：不弹横幅、不跳走，只在原地刷新未读（正在看的就是这个聊天，直接显示出来）
+        Sound.sfx('msg');
+        const v = this.view;
+        if (v === 'chat' && this.arg === id) {
+          if (!this.busy) { const ta = $('#chat-in'), keep = ta ? ta.value : ''; this.go('chat', id, true); const t2 = $('#chat-in'); if (t2 && keep) t2.value = keep; }
+        } else if (v === 'home' || v === 'toktok') this.go(v, this.arg, true);
+        else { const b = $('.app-head .back', scr()); if (b && !b.querySelector('.dot')) b.insertAdjacentHTML('beforeend', '<i class="dot"></i>'); }
+      } else if (first && !Story.ev) UI.notify('toktok', Game.CHATS[id].name, first.type === 'sticker' ? '[表情]' : (first.ko || '[消息]'), () => { this.open('home'); this.go('chat', id); });
       UI.updateBadge();
     },
 
