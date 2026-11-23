@@ -243,13 +243,21 @@
         add('eunji', working ? 3 : 1, `现在 ${now}（她：${st}）。宋恩智主动来八卦：茶水间听到的艺人传闻、约下午茶、打听她最近在忙什么。`);
       }
       add('group', 3, `现在 ${now}。三人群里东旻先说话（转发论坛帖、吐槽允在、报告练习室发生的事），允在有空也会插一两句。`);
-      add('dongmin', 1, `现在 ${now}。东旻单独私聊她：求她帮忙、问恋爱建议、吐槽允在，或者为自己追的女团练习生的事求助。`);
+      add('dongmin', 1, `现在 ${now}。东旻单独私聊她，这次聊的是：${topic(this.DONGMIN_TOPICS.concat(S.day >= 52 && Math.random() < 0.25 ? ['他追的那个女团练习生的一点小进展（和之前说的一致，还没在一起）'] : []))}。`);
       if (h >= 18 && h < 22) add('brother', 2.5, `现在 ${now}，他刚从部队拿到手机。主动找姐姐聊：吐槽部队伙食、班长、站岗，或者跟她要东西。`);
       if (S.amb >= 20) add('siwon', h >= 22 || h < 3 ? 2 : 0.5, `现在 ${now}。柳时元很克制地主动发一两句消息（练习结束、看到某样东西想起她）。`);
       const pick = () => { const tot = pool.reduce((a, x) => a + x.w, 0); let r = Math.random() * tot; for (let k = 0; k < pool.length; k++) { r -= pool[k].w; if (r <= 0) return pool.splice(k, 1)[0]; } return null; };
       const n = Math.random() < 0.25 ? 2 : 1; // 一次一两个人
       for (let k = 0; k < n && pool.length; k++) { const x = pick(); if (x && x.w > 0) { cnt[x.id] = (cnt[x.id] || 0) + 1; setTimeout(() => this.ping(x.id, x.why, day), 1500 + k * 4000); } }
     },
+    DONGMIN_TOPICS: [
+      '吐槽允在今天在练习室 / 待机室干的蠢事',
+      '求她帮忙打掩护或者帮忙带个东西',
+      '炫耀济州老家寄来的橘子，问她要不要',
+      '被队长俊浩骂了，来找嫂子诉苦',
+      '转发论坛上一个关于允在的帖子，紧张兮兮地问要不要紧',
+      '想让她偷偷给自己多配一份加餐'
+    ],
     AMBIENT_MAX: { friend: 2, shop: 3, work: 2, eunji: 2, group: 2, dongmin: 1, brother: 1, siwon: 1 },
     FRIEND_TOPICS: [
       '吐槽她自己公司的上司或同事（具体发生了什么）',
@@ -265,7 +273,7 @@
       try {
         const S = Game.S, j = await API.chatInitiate(id, reason);
         if (Game.S !== S || S.day !== day) return;
-        if (j.replies && j.replies.length) Phone.pushIncoming(id, j.replies);
+        if (j.replies && j.replies.length) { Phone.pushIncoming(id, j.replies); Phone.maybeDate(id, '', j.replies); } // 对方主动约你：弹框问要不要记进日程
       } catch (e) { console.warn(e); }
     },
     // 聊天里时间走过了约好的点

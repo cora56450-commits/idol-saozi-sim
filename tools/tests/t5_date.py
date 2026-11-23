@@ -28,6 +28,7 @@ async def main():
         # 和他聊天 → 约 21:00
         await pg.evaluate("Phone.open('home'); Phone.go('chat','he')")
         await pg.fill('#chat-in','今晚来我家吗'); await pg.click('#chat-send'); await pg.wait_for_timeout(3500)
+        if await pg.locator('#modal:not(.hidden) [data-x=yes]').count(): await pg.click('#modal [data-x=yes]'); await pg.wait_for_timeout(300)
         await pg.screenshot(path=SH+'d_chat.png', clip={'x':520,'y':0,'width':560,'height':900})
         await pg.evaluate("Phone.go('toktok')"); await pg.wait_for_timeout(200)
         await pg.screenshot(path=SH+'d_list.png', clip={'x':520,'y':0,'width':560,'height':900})
@@ -42,6 +43,7 @@ async def main():
         # 往后过直到见面
         for k in range(6):
             if await pg.evaluate("!!Story.ev"): break
+            if await pg.locator('#modal:not(.hidden)').count(): await pg.evaluate("UI.closeModal()")
             if await pg.locator('#ds-next').count(): await pg.click('#ds-next')
             await pg.wait_for_timeout(300)
             if await pg.locator('#transition:not(.hidden)').count(): await pg.click('#transition')

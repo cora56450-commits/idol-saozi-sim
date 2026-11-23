@@ -169,6 +169,8 @@
       S.dates.push(x);
       return x;
     },
+    // 之后几天约好的（桌面卡片上提前显示）
+    nextDate() { const S = this.S; return (S.dates || []).filter(x => x.day > S.day && !x.done).sort((a, b) => a.day - b.day || a.min - b.min)[0] || null; },
     pendingDate() { const S = this.S; return (S.dates || []).filter(x => x.day === S.day && !x.done).sort((a, b) => a.min - b.min)[0] || null; },
     dayWord(day) { const k = day - this.S.day; return k === 0 ? '今天' : k === 1 ? '明天' : k === 2 ? '后天' : this.dateStr(day).slice(5); },
     whoName(who) { return (CONFIG.NAMES[who] || who); },

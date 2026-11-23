@@ -188,9 +188,9 @@ ${extra || ''}`;
 
     // 兜底：AI 没标约好，但看起来像答应了 → 单独问一次「这段聊天里是不是约好了见面」
     async extractDate(chatId) {
-      const sys = `你在读一段 톡톡 聊天记录，判断玩家和对方是不是已经约好了一次具体的线下见面（时间和地点都说定了，玩家也答应了）。只是随口说"改天见"不算。今天是 ${Game.dateStr(Game.S.day)}，现在 ${UI.clock()}。只输出 JSON：{"agreed": true/false, "day_offset": 0, "time": "18:00", "place": "", "what": ""}。day_offset 是从今天算第几天（0 = 今天，周六就算到周六，最多 7）；time 用 24 小时制。`;
+      const sys = `你在读一段 톡톡 聊天记录（最后几条最重要），判断里面有没有一次具体的线下见面（哪天、几点、在哪都说出来了）。status：玩家已经答应了、或者双方都当成定下来了 → "agreed"；对方提出了具体安排、但玩家还没表态 → "proposed"；只是随口说"改天见"、或者没有具体时间 → "none"。今天是 ${Game.dateStr(Game.S.day)}，现在 ${UI.clock()}。只输出 JSON：{"status": "agreed|proposed|none", "day_offset": 0, "time": "18:00", "place": "", "what": ""}。day_offset 是从今天算第几天（0 = 今天，明天 = 1，周六就算到周六，最多 7）；time 用 24 小时制；place 写具体地点；what 用一句话写去干嘛。`;
       const j = await callJSON(sys, transcript(chatId, 14) || '（无）', 300);
-      return j && j.agreed ? j : null;
+      return j && /agreed|proposed/.test(j.status || '') && j.time ? j : null;
     },
 
     // 线下见面（邀约）：phase = open / talk / close

@@ -6,7 +6,7 @@ from playwright.async_api import async_playwright
 async def main():
     async with async_playwright() as p:
         b=await p.chromium.launch(executable_path='/usr/bin/google-chrome'); pg=await b.new_page(viewport={'width':1600,'height':900})
-        errs=[]; pg.on('pageerror',lambda e: errs.append(str(e)))
+        errs=[]; pg.on('pageerror',lambda e: errs.append(str(e)+' '+str(e.stack)[:400]))
         async def h(route): await route.fulfill(status=200, content_type='application/json', body=reply(route.request.post_data))
         await pg.route('https://fake.api/**', h)
         await pg.goto('file:///home/claude/proj/game/index.html'); await pg.wait_for_timeout(300)
@@ -15,7 +15,7 @@ async def main():
           Game.S.chats.friend.push({day:5,t:1250,speaker:'郑书娟',ko:'토요일 저녁 어때 홍대에서 고기 먹자',zh:'周六晚上怎么样 弘大那边吃肉'});
           Phone.open('home'); Phone.go('chat','friend')""")
         await pg.fill('#chat-in','好啊'); await pg.click('#chat-send'); await pg.wait_for_timeout(2500)
-        print(await pg.evaluate("JSON.stringify({dates:Game.S.dates, sys:Game.S.chats.friend.filter(m=>m.sys).map(m=>m.sys)})"), errs)
+        print(await pg.evaluate("JSON.stringify({dates:Game.S.dates, sys:Game.S.chats.friend.filter(m=>m.sys).map(m=>m.sys), modal:document.querySelector('#modal-inner').innerText})"), errs); await pg.screenshot(path='/home/claude/shots/agree_modal.png')
         await pg.screenshot(path='/home/claude/shots/agree.png', clip={'x':520,'y':0,'width':560,'height':900})
         await b.close()
 asyncio.run(main())

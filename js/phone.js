@@ -225,7 +225,7 @@
         if (j.player_ko) me.ko = j.player_ko;
         this.lastReply[id] = Game.nowMin();
         Game.applyFx(j.delta, 'chat');
-        if (!this.takeDate(id, j)) this.maybeDate(id, text);
+        if (!this.takeDate(id, j)) this.maybeDate(id, text, j.replies);
         this.refreshChat(id);
         for (const r of (j.replies || [])) {
           await sleep(700 + Math.random() * 1200);
@@ -254,22 +254,39 @@
       if (!(j.flags && j.flags.includes('date_promised') && j.date && (typeof j.date === 'string' || Object.keys(j.date).length))) return false;
       return this.addDateFor(id, j.date);
     },
-    addDateFor(id, date) {
+    addDateFor(id, date, quiet) {
       const S = Game.S;
       const who = { he: '他', group: '他', friend: '郑书娟', dongmin: '东旻', siwon: '柳时元', eunji: '宋恩智', shop: '白秀珍' }[id];
       const d = who && Game.addDate(date, S.day, who);
-      if (d) { const w = Game.dayWord(d.day); Game.remember(`和${Game.whoName(who)}约好了：${w} ${d.time} ${d.place}（${d.what}）`); S.chats[id].push({ sys: `约好了 · ${w} ${d.time} · ${d.place}`, day: S.day, t: Game.nowMin() }); UI.deskStats(); this.refreshChat(id); }
+      if (d) {
+        const w = Game.dayWord(d.day);
+        Game.remember(`和${Game.whoName(who)}约好了：${w} ${d.time} ${d.place}（${d.what}）`);
+        S.chats[id].push({ sys: `约好了 · ${w} ${d.time} · ${d.place}`, day: S.day, t: Game.nowMin() });
+        UI.deskStats(); this.refreshChat(id);
+        // 及时弹框告诉玩家：已经记进日程
+        if (!quiet) UI.info('约好了', `${w} ${Game.dateStr(d.day).slice(5)} ${d.time}\n和${who === '他' ? '他' : Game.whoName(who)}${d.place ? ' · ' + d.place : ''}${d.what ? '\n' + d.what : ''}\n\n已经记进日程，桌面上的卡片会提醒你。`);
+      }
       return !!d;
     },
-    // AI 没标约好：玩家这句像在答应、聊天里又提到了哪天几点，就再确认一次
-    async maybeDate(id, text) {
+    // 回复里出现了具体的见面安排（哪天几点）但 AI 没标约好：再问一次——定了就记进日程并弹框，只是对方提议就弹框问要不要记
+    _askedDates: {},
+    async maybeDate(id, text, replies) {
       if (!{ he: 1, group: 1, friend: 1, dongmin: 1, siwon: 1, eunji: 1, shop: 1 }[id]) return;
-      if (!/好|行|可以|ok|OK|去|见|约|没问题|定了|就这么|那就|ㅇㅋ|좋아/.test(text)) return;
-      const recent = Game.S.chats[id].slice(-8).map(m => (m.zh || '') + (m.ko || '')).join(' ') + text;
-      if (!/周[一二三四五六日天末]|礼拜|星期|明天|后天|今晚|今天晚上|晚上|中午|下午|\d+\s*[点:：]|[一二三四五六七八九十]+点|토요일|일요일|금요일|내일|저녁|시/.test(recent)) return;
+      const recent = (replies || []).map(r => (r.zh || '') + ' ' + (r.ko || '')).join(' ') + ' ' + (text || '') + ' ' + Game.S.chats[id].slice(-6).map(m => (m.zh || '') + (m.ko || '')).join(' ');
+      const hasTime = /周[一二三四五六日天末]|礼拜|星期|明天|后天|今晚|今天晚上|晚上|中午|下午|\d+\s*[点:：时]|[一二三四五六七八九十]+点|토요일|일요일|금요일|내일|모레|저녁|\d+시/.test(recent);
+      const hasMeet = /见|约|出来|走|去|集合|碰头|보자|만나|가자|먹자|ㄱㄱ|오케이|好|行|可以|定了/.test(recent);
+      if (!hasTime || !hasMeet) return;
       try {
-        const j = await API.extractDate(id === 'group' ? 'group' : id);
-        if (j && j.time) this.addDateFor(id, j);
+        const j = await API.extractDate(id);
+        if (!j) return;
+        const key = `${id}|${Game.S.day + (+j.day_offset || 0)}|${j.time}`;
+        if (this._askedDates[key]) return;
+        this._askedDates[key] = true;
+        if (j.status === 'agreed') { this.addDateFor(id, j); return; }
+        const who = { he: '他', group: '他', friend: '郑书娟', dongmin: '东旻', siwon: '柳时元', eunji: '宋恩智', shop: '白秀珍' }[id];
+        const w = Game.dayWord(Game.S.day + Math.max(0, Math.min(7, Math.round(+j.day_offset || 0))));
+        const ok = await UI.confirm(`${who === '他' ? '他' : Game.whoName(who)}约你${w} ${j.time}${j.place ? '，' + j.place : ''}${j.what ? '（' + j.what + '）' : ''}。记进日程吗？`, '记进日程', '先不');
+        if (ok) this.addDateFor(id, j, true);
       } catch (e) { console.warn(e); }
     },
 
@@ -346,7 +363,7 @@
           Game.applyFx(j.delta, 'chat');
           const reps = (j.replies || []).map(r => Object.assign({}, r));
           if (reps.length) this.pushIncoming(id, reps, at);
-          if (!this.takeDate(id, j)) this.maybeDate(id, mine.map(m => m.zh).join(' '));
+          if (!this.takeDate(id, j)) this.maybeDate(id, mine.map(m => m.zh).join(' '), j.replies);
           this.lastReply[id] = at;
           if (this.view === 'chat' && this.arg === id) { S.unread[id] = 0; this.go('chat', id); }
         } catch (e) { console.warn(e); P[id] = p; }

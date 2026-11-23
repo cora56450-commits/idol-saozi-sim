@@ -1,8 +1,9 @@
 import json, re
 def reply(body):
     d = json.loads(body); sys = d['messages'][0]['content']; user = d['messages'][1]['content']
-    if '判断玩家和对方是不是已经约好了' in sys:
-        out = {"agreed": True, "day_offset": 2, "time": "18:00", "place": "弘大烤肉店", "what": "和书娟吃烤肉"}
+    if '判断里面有没有一次具体的线下见面' in sys:
+        if '好啊' in user: out = {"status": "agreed", "day_offset": 2, "time": "18:00", "place": "弘大烤肉店", "what": "和书娟吃烤肉"}
+        else: out = {"status": "proposed", "day_offset": 1, "time": "12:00", "place": "弘大站2号出口", "what": "先喝咖啡，晚上去KTV"}
     elif '把下面每一句中文翻成韩文' in sys:
         n = len([l for l in user.split('\n') if re.match(r'^\d+\. ', l)])
         out = {"ko": [f"번역된 말 {i+1}" for i in range(n)]}
@@ -15,6 +16,8 @@ def reply(body):
                          {"title_ko": "음방 무관중 슬프다", "title_zh": "打歌没观众好难过", "hot": False, "views": 300, "body_ko": "ㅠㅠ", "body_zh": "呜呜", "comments": []}],
                "instasnap": [{"account": "@yunjae_lumiere", "display_name": "윤재", "note": "练习室镜子自拍", "caption_ko": "연습 끝", "caption_zh": "练习结束", "likes": 50321, "comments": [{"account": "@fan1", "ko": "잘생겼다", "zh": "好帅"}]}],
                "fan_group": [{"speaker": "群友 A", "ko": "다들 스밍", "zh": "大家刷流", "time": "10:00"}], "exposure_hint": 0, "alerts": []}
+    elif '【为什么主动发】' in user and '郑书娟' in sys and '约这周末' in user:
+        out = {"player_ko": "", "replies": [{"speaker": "郑书娟", "type": "text", "ko": "아무튼 내일 12시에 홍대역 2번 출구에서 보자", "zh": "总之明天12点弘大站2号出口见", "note": ""}], "delta": {}}
     elif '现在你扮演私下的徐允在' in sys:
         if '【为什么主动发】' in user:
             out = {"player_ko": "", "replies": [{"type": "text", "ko": "누나 나 대기실", "zh": "姐姐我在待机室", "note": ""}], "delta": {}, "flags": [], "date": {}}
