@@ -136,6 +136,22 @@
       return [[540, '去公司', '打卡上班'], [780, '午休', '上午的饮食表核对完了'], [1020, '下午', '给团员发明天的菜单'], [1080, '下班', '走出公司大楼'], [1260, '晚上', ''], [1410, '深夜', ''], [1530, '凌晨', '']];
     },
     nextSlot() { const m = this.S.minutes || 510; return this.timeSlots().find(x => x[0] > m + 10) || null; },
+    // 他今天的状态：按行程算累不累，心情每天随机一点；今天感情掉得多 / 吵过架就变差
+    heMood() {
+      const S = this.S;
+      if (!S.heMood || S.heMood.day !== S.day) {
+        const plan = SCHEDULE.todayPlan(S.day);
+        const heavy = /凌晨|一整天|第二天|拍剧|外景|颁奖|直播|彩排一整天/.test(plan), light = /空出|休息|难得|没有行程|放假/.test(plan);
+        const r = Math.random();
+        S.heMood = { day: S.day, tired: light ? 0 : heavy ? (r < 0.6 ? 2 : 1) : (r < 0.25 ? 2 : r < 0.7 ? 1 : 0), mood: Math.random() < 0.2 ? 0 : Math.random() < 0.55 ? 2 : 1 };
+      }
+      const m = S.heMood, h = Math.floor(this.nowMin() / 60) % 24;
+      let tired = m.tired + ((h >= 23 || h < 3) && m.tired < 2 && !/空出|难得/.test(SCHEDULE.todayPlan(S.day)) ? 1 : 0);
+      let mood = m.mood; if (S.dayDelta && S.dayDelta.aff <= -3) mood = 0;
+      const T = ['精神还行', '有点累', '累瘫了'][Math.min(2, tired)], M = ['心情不太好', '心情一般', '心情不错'][mood];
+      return { tired: Math.min(2, tired), mood, text: `${T}，${M}` };
+    },
+
     // 现在几点（分钟）：剧情里按剧情时间，平时按桌面时间
     nowMin() { return (window.Story && Story.ev && Story.storyMin != null) ? (Story.storyMin < 360 ? Story.storyMin + 1440 : Story.storyMin) : (this.S.minutes || 510); },
     hhmm(min) { return `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`; },

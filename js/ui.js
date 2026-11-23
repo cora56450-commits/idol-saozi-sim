@@ -24,7 +24,7 @@
       const m = (window.Story && Story.ev && Story.storyMin != null) ? Story.storyMin : ((Game.S && Game.S.minutes) || 510);
       return `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
     },
-    tick(min) { if (Game.S) { Game.S.minutes = Math.min(((Game.S.minutes) || 510) + min, 26 * 60 + 59); this.deskStats(); } },
+    tick(min) { if (Game.S) { Game.S.minutes = Math.min(((Game.S.minutes) || 510) + min, 26 * 60 + 59); this.deskStats(); if (window.Phone && Phone.flushPending) Phone.flushPending(); } },
 
     // ---- 桌面 ----
     renderDesk() {

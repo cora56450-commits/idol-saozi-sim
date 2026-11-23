@@ -73,6 +73,7 @@
 是否进入他劈腿线：${S.flags.cheat ? '是' : '否'}
 今天的固定事件：${ev ? ev.title : '无'}
 今天他的行程：${SCHEDULE.todayPlan(S.day)}
+他现在的状态：${Game.heMood().text}（决定他回几条、什么语气，见私聊规则）
 现在时间：${UI.clock()}；她现在：${Game.workStatus()}
 ${S.dates && S.dates.length ? '已经约好的见面：' + S.dates.filter(d => !d.done).map(d => `第${d.day}天 ${d.time} 和${Game.whoName(d.who || '他')} ${d.place}（${d.what || ''}）`).join('；') + '\n' : ''}一直有效的事（不要和这些矛盾）：
 ${(S.facts || []).map(f => '- ' + f).join('\n') || '- （无）'}

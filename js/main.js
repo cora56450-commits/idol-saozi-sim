@@ -216,10 +216,12 @@
       UI.renderDesk();
       this._skipping = false;
       Game.autosave();
+      const waiting = !!(S.pendingReply && S.pendingReply.he);
+      Phone.flushPending(); // 之前没回的，到点了就回
       // 行程间隙他可能会来找你；开店时店里的群会有人说话
       if (!Game.settings().apiKey) return;
       const day = S.day;
-      if (Math.random() < 0.5) this.ping('he', `现在 ${UI.clock()}（她：${Game.workStatus()}）。他在行程间隙或收工以后主动找她，聊今天行程里的幕后小事（今天的行程：${SCHEDULE.todayPlan(day)}）。`, day);
+      if (!waiting && Math.random() < 0.5) this.ping('he', `现在 ${UI.clock()}（她：${Game.workStatus()}）。他在行程间隙或收工以后主动找她，聊今天行程里的幕后小事（今天的行程：${SCHEDULE.todayPlan(day)}）。`, day);
       this.ambient(nx, day);
     },
     // 其他人自己也会发消息：闺蜜、店里的群、三人群、弟弟……每次往后过挑一两个
@@ -268,9 +270,12 @@
       Phone.close(); $('#phone').classList.add('hidden'); $('#notify').classList.add('hidden');
       Story.mode = 'gal'; Story.log = []; Story.storyMin = null; Story.cgOn = false; Story._cgShown = {};
       Sound.bgm(isHe ? 'sweet' : 'theme');
-      const P = d.place + ' ' + (d.what || '');
-      const bg = /家/.test(d.place) && !/他家|她家里吃饭/.test(d.place) ? 'apartment' : /烤肉|고기|肉|酒|吃|餐|炸鸡|饭|聚/.test(P) ? 'bbq' : /江|兜风|车/.test(P) ? 'hanriver' : /公司|练习室/.test(P) ? 'corridor' : isHe ? 'parking' : 'bbq';
-      Story.setBg(`assets/bg/${bg}.jpg`);
+      const bg = this.dateBg(d, isHe);
+      // 新背景还没生成的话，先用一张现有的顶上
+      const img = new Image();
+      img.onload = () => Story.setBg(`assets/bg/${bg}.jpg`);
+      img.onerror = () => Story.setBg(`assets/bg/${this.BG_FALLBACK[bg] || 'bbq'}.jpg`);
+      img.src = `assets/bg/${bg}.jpg`;
       $('#scene-sprite').style.display = 'none'; $('#scene-section').innerHTML = `<span>${esc(d.time)} · ${esc(d.place)}${isHe ? '' : ' · ' + esc(nm)}</span>`;
       $('#choices').innerHTML = ''; $('#dialog').classList.remove('hidden');
       UI.show('scr-scene');
@@ -328,6 +333,30 @@
       Game.autosave();
       this.checkExposure();
     },
+    // 约在哪，就用哪张背景（新背景见 提示词/1123晚_背景_头像_ins配图提示词.md）
+    BG_FALLBACK: { mall: 'corridor', cafe: 'kitchen', pocha: 'bbq', karaoke: 'backstage', street: 'hanriver', chicken: 'bbq', hanpark: 'hanriver', shop: 'kitchen', lounge: 'corridor', jjim: 'apartment' },
+    dateBg(d, isHe) {
+      const P = (d.place || '') + ' ' + (d.what || ''), h = Math.floor(d.min / 60) % 24;
+      const rules = [
+        [/她家|你家|我家|^家/, 'apartment'],
+        [/汗蒸|찜질/, 'jjim'],
+        [/烤肉|고기|삼겹|五花/, 'bbq'],
+        [/汉江公园|野餐|한강공원/, 'hanpark'],
+        [/炸鸡|치킨|치맥|啤酒/, 'chicken'],
+        [/포차|路边摊|帐篷|小酒馆|居酒屋|喝酒|烧酒|酒/, 'pocha'],
+        [/KTV|노래방|唱歌|练歌房|K歌/, 'karaoke'],
+        [/商场|逛街|购物|百货|COEX|时代广场|买衣服|shopping/i, 'mall'],
+        [/咖啡|카페|甜品|下午茶|奶茶|蛋糕/, 'cafe'],
+        [/店里|工坊|공방/, 'shop'],
+        [/公司|休息室|茶水间|练习室/, isHe ? 'corridor' : 'lounge'],
+        [/汉江|兜风|车/, 'hanriver'],
+        [/街|弘大|散步|明洞|江南|圣水|延南/, 'street'],
+        [/吃|饭|餐|聚/, 'bbq']
+      ];
+      for (const [re, k] of rules) if (re.test(P)) return k;
+      return isHe ? 'parking' : (h >= 18 || h < 5 ? 'street' : 'cafe');
+    },
+
     // 见面时的输入：自己打字，或者送他走
     dateInput() {
       return new Promise(res => {
@@ -359,6 +388,8 @@
       }
       const ok = await UI.confirm(`结束第 ${S.day} 天？`, '吃完便当，睡觉', '再玩会儿');
       if (!ok) return;
+      // 还没回的：睡前（或者半夜）他们总会回的
+      if (S.pendingReply && Object.keys(S.pendingReply).length && Game.settings().apiKey) { UI.loading(true, '睡前看一眼手机'); await Phone.flushPending(true); UI.loading(false); }
       // 白天发给弟弟的消息：晚上六点他拿到手机，一起回
       if (S.brotherPending && Game.settings().apiKey) {
         S.brotherPending = false;

@@ -78,32 +78,44 @@ window.CONFIG = {
   AVATARS: {
     he: 'assets/avatar/yunjae.png', dongmin: 'assets/avatar/dongmin.png', siwon: 'assets/avatar/siwon.png',
     friend: 'assets/avatar/seoyeon.png', eunji: 'assets/avatar/eunji.png', group: 'assets/avatar/group.png',
-    work: 'assets/avatar/work.png', brother: 'assets/avatar/brother.png', moon: 'assets/avatar/moon.png'
+    work: 'assets/avatar/work.png', brother: 'assets/avatar/brother.png', moon: 'assets/avatar/moon.png',
+    shop: 'assets/avatar/shop.png', official: 'assets/avatar/official.png', junho: 'assets/avatar/junho.png'
   },
   // InstaSnap 上的账号头像：按账号名 / 昵称匹配到上面的头像
   INSTA_AVATAR: [['윤재|允在|yoonjae|yunjae', 'he'], ['동민|东旻|dongmin', 'dongmin'], ['시원|时元|siwon', 'siwon'],
-    ['달빛|moon\\.collector', 'moon'], ['서연|书娟|seoyeon|seo\\.', 'friend'], ['은지|恩智|eunji', 'eunji']],
+    ['달빛|moon\\.collector', 'moon'], ['서연|书娟|seoyeon|seo\\.', 'friend'], ['은지|恩智|eunji', 'eunji'],
+    ['lumiere_official|루미에르|lumière', 'official'], ['준호|俊浩|junho', 'junho']],
 
-  // InstaSnap 配图（assets/insta/<img>.jpg）：who 匹配账号/昵称，tags 匹配照片描述，挑最贴的一张；没有合适的就只显示文字
+  // InstaSnap 配图：只有没有人的景色 / 物品（提示词/1123晚_背景_头像_ins配图提示词.md）。拍到人的动态显示灰框。
+  // tags 和动态的照片描述（note）对上才用；who 可选，是那个账号发的会优先
   INSTA_PHOTOS: [
-    { img: 'ig_01', who: '윤재|允在|yoonjae|yunjae', tags: '自拍|镜子|练习室|口罩' },
-    { img: 'ig_02', who: '윤재|允在|yoonjae|yunjae', tags: '窗|咖啡|阳光|精修|侧脸|杯' },
-    { img: 'ig_03', who: '윤재|允在|yoonjae|yunjae', tags: '胶片|相机|手|夜|街' },
-    { img: 'ig_04', who: '동민|东旻|dongmin', tags: '丑照|睡|车|保姆车|允在' },
-    { img: 'ig_05', who: '동민|东旻|dongmin', tags: '吃|炸鸡|辣炒年糕|宿舍|游戏|手柄|外卖' },
-    { img: 'ig_06', who: '동민|东旻|dongmin', tags: '自拍|后台|妆|待机室|比耶' },
-    { img: 'ig_07', who: '준호|俊浩|junho', tags: '作曲|工作室|键盘|咖啡|屏幕|美式' },
-    { img: 'ig_08', who: '시원|时元|siwon', tags: '天花板|练习室|灯' },
-    { img: 'ig_09', who: '시원|时元|siwon', tags: '天空|夜|桥|路灯|汉江|云' },
-    { img: 'ig_10', who: 'lumiere|루미에르', tags: '合照|后台|四个人|成员|打歌|舞台服' },
-    { img: 'ig_11', who: 'lumiere|루미에르', tags: '预告|海报|行程|回归|teaser|日程' },
-    { img: 'ig_12', who: '달빛|moon|站姐|fansite|master', tags: '下班|上班|出勤|退勤|口罩|挥手|路' },
-    { img: 'ig_13', who: '달빛|moon|站姐|fansite|master', tags: '舞台|红|灯|唱|耳返|直拍' },
-    { img: 'ig_14', who: '은채|恩彩|eunchae', tags: '剧组|剧本|片场|自拍|拍摄' },
-    { img: 'ig_15', who: '서연|书娟|seoyeon', tags: '猫|办公|键盘|下班|日常' },
-    { img: 'ig_16', who: '은지|恩智|eunji', tags: '咖啡|美式|工牌|公司|办公桌' },
-    { img: 'ig_17', who: '.', tags: '应援|手灯|小卡|专辑|周边|应援棒' },
-    { img: 'ig_18', who: '.', tags: '目击|偶遇|咖啡店|汉南|模糊|远处|帽子|街' }
+    { img: 'ig_01', tags: '练习室|镜子|练舞|练习|汗|水' },
+    { img: 'ig_02', tags: '咖啡|窗|早上|阳光|杯|早安' },
+    { img: 'ig_03', tags: '胶片|相机|夜|街|散步' },
+    { img: 'ig_04', tags: '车|保姆车|移动|路上|高速|窗外|去行程' },
+    { img: 'ig_05', tags: '夜宵|炸鸡|辣炒年糕|宿舍|外卖|游戏|手柄|吃' },
+    { img: 'ig_06', tags: '后台|待机室|化妆|妆|打歌服|镜子|舞台服' },
+    { img: 'ig_07', tags: '作曲|工作室|键盘|屏幕|录音|写歌|美式' },
+    { img: 'ig_08', tags: '天花板|灯|练习室灯' },
+    { img: 'ig_09', tags: '汉江|桥|夜|江|夜景' },
+    { img: 'ig_10', tags: '预告|teaser|回归|海报|comeback' },
+    { img: 'ig_11', tags: '日程|行程|schedule|时间表|计划' },
+    { img: 'ig_12', tags: '专辑|实体|开箱|album|小卡' },
+    { img: 'ig_13', tags: '一位|奖杯|获奖|trophy|1位|音乐节目' },
+    { img: 'ig_14', tags: '生日应援|应援广告|地铁|广告|灯箱' },
+    { img: 'ig_15', tags: '蛋糕|生日|蜡烛|庆祝|派对' },
+    { img: 'ig_16', tags: 'MAMA|颁奖|典礼|观众席|无观众|舞台' },
+    { img: 'ig_17', tags: '圣诞|雪|树|年末|礼物' },
+    { img: 'ig_18', tags: '新年|跨年|日出|元旦|烟花|新年快乐' },
+    { img: 'ig_19', tags: '剧组|片场|剧本|拍摄|场记|网剧' },
+    { img: 'ig_20', tags: '猫|键盘|办公|摸鱼|上班' },
+    { img: 'ig_21', tags: '美式|工牌|公司|办公桌|加班' },
+    { img: 'ig_22', tags: '应援|手灯|应援棒|周边|小卡|打卡' },
+    { img: 'ig_23', tags: '目击|偶遇|汉南|街|咖啡店|远处' },
+    { img: 'ig_24', tags: '天空|晚霞|夜空|路灯|云|傍晚' },
+    { img: 'ig_25', tags: '雨|下雨|窗|雨天' },
+    { img: 'ig_26', tags: '健身|跑步|运动|gym|减脂|锻炼' },
+    { img: 'ig_27', tags: '签售|签名|视频签售|视频通话|马克笔' }
   ],
 
   // 结局 CG（assets/cg/）
@@ -220,6 +232,10 @@ window.SCHEDULE = {
   todayPlan(day) {
     const p = this.phaseOf(day);
     if (day === 16) return '回归日：零点新歌音源发布，白天准备，晚上 8 点线上 Showcase 直播';
+    // 2020 MAMA：12 月 6 日，线上无观众，坡州 CJ ENM Contents World
+    if (day === 62) return '他的生日：白天网剧拍摄，晚上去公司练 MAMA 特别舞台';
+    if (day === 63) return '去坡州 CJ ENM Contents World 做 MAMA 走位彩排，从下午排到深夜';
+    if (day === 64) return '2020 MAMA 颁奖礼（线上直播，没有观众）：中午到坡州做最后彩排，下午 6 点直播开始，结束后公司聚餐';
     const pick = (arr) => arr[day % arr.length];
     // 回归准备期按天写死，一步步走到第 16 天回归（MV 只在第 1 天拍）
     if (p === '回归准备') return [

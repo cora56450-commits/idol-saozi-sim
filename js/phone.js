@@ -37,16 +37,21 @@
     const r = (CONFIG.INSTA_AVATAR || []).find(([re]) => new RegExp(re, 'i').test(s));
     return r ? r[1] : 'ig';
   }
+  // 只给没有人的照片配图（景色 / 物品）；拍到人的显示灰框 + 文字描述
+  const PERSON_RE = /自拍|合照|合影|站姐|直拍|他的脸|侧脸|背影|身影|本人|成员们|四个人|比耶|丑照|睡着|在唱|唱歌的|跳舞的|舞台上的|穿着|戴着|看镜头|笑着|手里拿|她的|他的手|人像|偶遇.*看到/;
   function igPhoto(p, seed) {
     if (p._img !== undefined) return p._img;
     const s = `${p.account || ''} ${p.display_name || ''}`, note = p.note || '';
+    if (p.has_person === true || (p.has_person == null && PERSON_RE.test(note))) return (p._img = '');
     let best = null, bestScore = 0;
     (CONFIG.INSTA_PHOTOS || []).forEach((c, k) => {
-      const own = c.who !== '.' && new RegExp(c.who, 'i').test(s);
-      if (c.who !== '.' && !own) return;
-      const hits = note.split('').length ? (c.tags.split('|').filter(w => note.includes(w)).length) : 0;
-      const score = (own ? 2 : 0) + hits * 3 + ((seed + k) % 7) / 10;
-      if ((own || hits) && score > bestScore) { best = c.img; bestScore = score; }
+      // 对上的词越多、越长（越具体）分越高：「练习室天花板的灯」用天花板那张，不用练习室那张
+      let hits = c.tags.split('|').filter(w => note.toLowerCase().includes(w.toLowerCase()));
+      hits = hits.filter(w => !hits.some(o => o !== w && o.includes(w))); // 「练习」被「练习室」包含，只算一次
+      if (!hits.length) return;
+      const own = c.who && new RegExp(c.who, 'i').test(s);
+      const score = hits.reduce((a, w) => a + 2 + w.length, 0) + (own ? 2 : 0) + ((seed + k) % 7) / 10;
+      if (score > bestScore) { best = c.img; bestScore = score; }
     });
     p._img = best || '';
     return p._img;
@@ -76,10 +81,10 @@
       if (window.Main && Main.checkDate) Main.checkDate(); // 聊着聊着到了约好的时间：放下手机他就到了
     },
 
-    go(view, arg, quiet) { // quiet：只是刷新当前画面（来了新消息），不走时间、不弹提示
+    go(view, arg) {
       this.view = view; this.arg = arg;
       const S = Game.S;
-      if (!quiet) UI.tick(1);
+      UI.tick(1);
       const html = {
         home: () => this.home(),
         toktok: () => this.chatList(),
@@ -102,7 +107,7 @@
       if (view === 'blink') S.unread.blink = 0;
       if (view === 'pan') S.unread.pan = 0;
       if (view === 'insta') S.unread.insta = 0;
-      if (!quiet) UI.tip({ home: 'home', chat: 'chat', blink: 'blink', pan: 'pan', insta: 'insta' }[view]);
+      UI.tip({ home: 'home', chat: 'chat', blink: 'blink', pan: 'pan', insta: 'insta' }[view]);
     },
 
     unreadTotal() {
@@ -153,7 +158,7 @@
       } else {
         inner = `<div class="bubble">${esc(m.ko)}<span class="zh">${esc(m.zh)}</span>${m.note && m.type === 'link' ? `<span class="note">${esc(m.note)}</span>` : ''}</div>`; // 普通文字消息不显示 note（AI 有时会在里面写「顺口关心」这种旁白）
       }
-      if (me) return `<div class="msg me"><div class="col">${inner}</div></div>`;
+      if (me) return `<div class="msg me">${m.unread ? '<span class="read1">1</span>' : ''}<div class="col">${inner}</div></div>`;
       const who = m.speaker || Game.CHATS[chatId].who;
       const key = speakerKey[who] || chatId;
       const showName = chatId === 'group' || chatId === 'work';
@@ -173,8 +178,7 @@
         out += this.msgHTML(m, id);
       });
       out = `<div class="chat-intro">${esc(c.desc || '')}</div>` + (out || `<div class="empty-tip">还没有消息</div>`);
-      const others = Object.keys(Game.CHATS).some(k => k !== id && (S.unread[k] || 0) > 0); // 别人有未读：返回键上亮小红点
-      return `<div class="app toktok">${statusBar(true)}${head(c.name, '', 'toktok').replace('</button>', others ? '<i class="dot"></i></button>' : '</button>')}<div class="app-body"><div class="msgs" id="msgs">${out}</div></div>
+      return `<div class="app toktok">${statusBar(true)}${head(c.name, '', 'toktok')}<div class="app-body"><div class="msgs" id="msgs">${out}</div></div>
         <div class="app-foot"><textarea id="chat-in" placeholder="打中文，发出去会变成韩文"></textarea><button class="send" id="chat-send"><img src="assets/ui/ic_send.png" alt=""></button></div></div>`;
     },
 
@@ -199,6 +203,15 @@
           return;
         }
       }
+      // 他们是爱豆：在行程里就不会秒回。消息先挂着（旁边显示「1」），等时间往后走到他有空再一起回
+      const P = S.pendingReply = S.pendingReply || {};
+      if (P[id] || this.isBusy(id)) {
+        me.unread = true;
+        if (!P[id]) P[id] = { since: me.t, due: this.replyDue(me.t) };
+        this.go('chat', id);
+        API.translateKo([text]).then(ko => { if (ko[0] && !me.ko) { me.ko = ko[0]; if (this.view === 'chat' && this.arg === id) this.go('chat', id); } }).catch(() => {});
+        return;
+      }
       this.busy = true;
       const box = $('#msgs');
       box.insertAdjacentHTML('beforeend', `<div class="typing" id="typing">입력 중…</div>`);
@@ -206,12 +219,9 @@
       try {
         const j = await API.chat(id, text);
         if (j.player_ko) me.ko = j.player_ko;
+        this.lastReply[id] = Game.nowMin();
         Game.applyFx(j.delta, 'chat');
-        if (j.flags && j.flags.includes('date_promised') && j.date && (typeof j.date === 'string' || Object.keys(j.date).length)) {
-          const who = { he: '他', group: '他', friend: '郑书娟', dongmin: '东旻', siwon: '柳时元', eunji: '宋恩智', shop: '白秀珍' }[id];
-          const d = who && Game.addDate(j.date, S.day, who);
-          if (d) { const w = Game.dayWord(d.day); Game.remember(`和${Game.whoName(who)}约好了：${w} ${d.time} ${d.place}（${d.what}）`); S.chats[id].push({ sys: `约好了 · ${w} ${d.time} · ${d.place}`, day: S.day }); UI.deskStats(); }
-        }
+        this.takeDate(id, j);
         this.go('chat', id);
         for (const r of (j.replies || [])) {
           await sleep(700 + Math.random() * 1200);
@@ -233,11 +243,70 @@
       Main.checkExposure();
     },
 
+    // 聊天里约好了见面 → 排进日程
+    takeDate(id, j) {
+      const S = Game.S;
+      if (!(j.flags && j.flags.includes('date_promised') && j.date && (typeof j.date === 'string' || Object.keys(j.date).length))) return;
+      const who = { he: '他', group: '他', friend: '郑书娟', dongmin: '东旻', siwon: '柳时元', eunji: '宋恩智', shop: '白秀珍' }[id];
+      const d = who && Game.addDate(j.date, S.day, who);
+      if (d) { const w = Game.dayWord(d.day); Game.remember(`和${Game.whoName(who)}约好了：${w} ${d.time} ${d.place}（${d.what}）`); S.chats[id].push({ sys: `约好了 · ${w} ${d.time} · ${d.place}`, day: S.day, t: Game.nowMin() }); UI.deskStats(); }
+    },
+
+    // ---------- 不秒回 ----------
+    IDOL_CHATS: ['he', 'dongmin', 'siwon', 'group'],
+    lastReply: {},
+    // 现在发过去，他会不会在忙
+    isBusy(id) {
+      if (!this.IDOL_CHATS.includes(id)) return false;
+      const S = Game.S, now = Game.nowMin(), h = Math.floor(now / 60) % 24;
+      // 刚刚还在来回聊（10 分钟内他回过），大概率接着秒回
+      if (this.lastReply[id] != null && now - this.lastReply[id] <= 10 && this.lastReply[id] <= now) return Math.random() < 0.15;
+      const phase = SCHEDULE.phaseOf(S.day);
+      let p;
+      if (h >= 2 && h < 8) p = 0.9;            // 睡觉
+      else if (h >= 23 || h < 2) p = 0.2;      // 深夜收工，最常秒回
+      else if (h >= 20) p = 0.4;
+      else p = /空档期$/.test(phase) ? 0.45 : 0.75; // 白天：打歌 / 合练 / 拍剧时基本看不了手机
+      return Math.random() < p;
+    },
+    // 什么时候能回：白天隔 40 分钟到两个多小时；夜里睡着了就等到早上
+    replyDue(t) {
+      const h = Math.floor(t / 60) % 24;
+      if (h >= 2 && h < 8) return Math.max(t + 30, (t >= 1440 ? 1440 : 0) + 8 * 60 + 40 + Math.floor(Math.random() * 40)) % (27 * 60);
+      return t + 40 + Math.floor(Math.random() * 110);
+    },
+    // 时间往后走了：到点的人一起回（回复的时间记成他真正看到手机的那个点）
+    async flushPending(force) {
+      const S = Game.S, P = S && S.pendingReply; if (!P || this._flushing) return;
+      const now = Game.nowMin();
+      const ids = Object.keys(P).filter(id => force || now >= P[id].due);
+      if (!ids.length || !Game.settings().apiKey) return;
+      this._flushing = true;
+      for (const id of ids) {
+        const p = P[id]; delete P[id];
+        const mine = S.chats[id].filter(m => m.me && m.unread);
+        const at = Math.min(p.due, Math.max(now, p.since));
+        try {
+          const text = mine.map(m => m.zh).join('\n') + `\n（这${mine.length > 1 ? '几' : ''}条是她 ${Game.hhmm(p.since)} 发的，他一直在忙，${Game.hhmm(at)} 才看到手机。回的时候可以顺口说一句刚才在干嘛、为什么没回。）`;
+          const j = await API.chat(id, text);
+          mine.forEach(m => { m.unread = false; });
+          Game.applyFx(j.delta, 'chat');
+          const reps = (j.replies || []).map(r => Object.assign({}, r));
+          if (reps.length) this.pushIncoming(id, reps, at);
+          this.takeDate(id, j);
+          this.lastReply[id] = at;
+          if (this.view === 'chat' && this.arg === id) { S.unread[id] = 0; this.go('chat', id); }
+        } catch (e) { console.warn(e); P[id] = p; }
+      }
+      this._flushing = false;
+      Main.checkExposure();
+    },
+
     // 对方主动发来（不打开也能收到）
-    pushIncoming(id, replies) {
+    pushIncoming(id, replies, at) {
       const S = Game.S;
       for (const r of replies) {
-        const m = { day: S.day, t: Game.nowMin(), speaker: r.speaker || (id === 'he' ? '他' : Game.CHATS[id].who) };
+        const m = { day: S.day, t: at != null ? at : Game.nowMin(), speaker: r.speaker || (id === 'he' ? '他' : Game.CHATS[id].who) };
         if (r.type === 'sticker') { m.type = 'sticker'; m.sticker = r.ko; }
         else if (r.type === 'photo') { m.type = 'photo'; m.note = r.note || r.zh; }
         else { m.ko = r.ko; m.zh = r.zh; m.note = r.note; if (r.type === 'voice') m.type = 'voice'; }
@@ -245,15 +314,7 @@
       }
       S.unread[id] = (S.unread[id] || 0) + replies.length;
       const first = replies[0];
-      if (this.isOpen() && !Story.ev) {
-        // 手机开着：不弹横幅、不跳走，只在原地刷新未读（正在看的就是这个聊天，直接显示出来）
-        Sound.sfx('msg');
-        const v = this.view;
-        if (v === 'chat' && this.arg === id) {
-          if (!this.busy) { const ta = $('#chat-in'), keep = ta ? ta.value : ''; this.go('chat', id, true); const t2 = $('#chat-in'); if (t2 && keep) t2.value = keep; }
-        } else if (v === 'home' || v === 'toktok') this.go(v, this.arg, true);
-        else { const b = $('.app-head .back', scr()); if (b && !b.querySelector('.dot')) b.insertAdjacentHTML('beforeend', '<i class="dot"></i>'); }
-      } else if (first && !Story.ev) UI.notify('toktok', Game.CHATS[id].name, first.type === 'sticker' ? '[表情]' : (first.ko || '[消息]'), () => { this.open('home'); this.go('chat', id); });
+      if (first && !Story.ev) UI.notify('toktok', Game.CHATS[id].name, first.type === 'sticker' ? '[表情]' : (first.ko || '[消息]'), () => { this.open('home'); this.go('chat', id); });
       UI.updateBadge();
     },
 
