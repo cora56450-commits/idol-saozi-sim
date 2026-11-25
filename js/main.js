@@ -231,34 +231,67 @@
       const pool = [];
       // 每个人一天主动找你的次数有上限（书娟一天最多两次）
       const cnt = (S.ambientCount && S.ambientCount.day === day) ? S.ambientCount : (S.ambientCount = { day });
-      const add = (id, w, why) => { if (list.includes(id) && (cnt[id] || 0) < (this.AMBIENT_MAX[id] || 1)) pool.push({ id, w, why }); };
-      const topic = (arr) => arr[Math.floor(Math.random() * arr.length)];
+      const add = (id, w, why, tp) => { if (list.includes(id) && (cnt[id] || 0) < (this.AMBIENT_MAX[id] || 1)) pool.push({ id, w, why, tp }); };
+      // 话题池：每人记住最近用过的几个，挑的时候跳过，免得老围着一个话题转
+      const log = S.topicLog || (S.topicLog = {});
+      const topic = (id, arr) => {
+        const recent = log[id] || [], keep = Math.max(1, Math.floor(arr.length * 0.6));
+        let cand = arr.map((t, i) => i).filter(i => !recent.slice(-keep).includes(arr[i]));
+        if (!cand.length) cand = arr.map((t, i) => i);
+        const i = cand[Math.floor(Math.random() * cand.length)];
+        return { id, text: arr[i] };
+      };
+      const said = (tp) => { if (!tp) return; const r = log[tp.id] || (log[tp.id] = []); r.push(tp.text); if (r.length > 12) r.shift(); };
+      const NO_REPEAT = '按这里给的话题来，不要绕回聊天记录里已经聊过的事和说法；话题可以自然展开，不用每句都扣着它。';
+      let tp;
       if (S.role === 'civ') {
-        add('shop', /去店里/.test(nx[1]) ? 6 : working ? 3 : 0.5, working
-          ? `现在 ${now}，店里营业中。白秀珍或吴叡琳在工作群里说店里的事：订单、备菜、食材不够、配送跑到哪、客人的奇怪要求、叡琳上课迟到之类。`
-          : `现在 ${now}，店已经关了。白秀珍或吴叡琳在工作群里随口说点下班后的事，或者提醒明天的订单。`);
-        add('friend', 1.5, `现在 ${now}（她：${st}）。闺蜜郑书娟主动找她，这次聊的是：${topic(this.FRIEND_TOPICS)}。书娟早就知道她在和允在交往，不要问"有什么好事""是不是恋爱了""最近气色好"这种话；也不要重复聊天记录里已经聊过的话题。`);
+        tp = working ? (Math.random() < 0.15 ? topic('shop_off', this.SHOP_OFF_TOPICS) : topic('shop', this.SHOP_TOPICS)) : topic('shop_after', this.SHOP_AFTER_TOPICS);
+        add('shop', /去店里/.test(nx[1]) ? 6 : working ? 3 : 0.5, `现在 ${now}，${working ? '店里营业中' : '店已经关了'}。白秀珍或吴叡琳在工作群里说话，这次说的是：${tp.text}。工作群以店里的事为主，偶尔闲聊一两句。${NO_REPEAT}`, tp);
+        tp = topic('friend', this.FRIEND_TOPICS);
+        add('friend', 1.5, `现在 ${now}（她：${st}）。闺蜜郑书娟主动找她，这次聊的是：${tp.text}。书娟早就知道她在和允在交往，不要问"有什么好事""是不是恋爱了""最近气色好"这种话。${NO_REPEAT}`, tp);
       } else {
-        add('work', working ? 4 : 0.5, `现在 ${now}。公司工作群里室长或宣传部发公事：明天行程变动、团员饮食问题、会议时间、偶尔有人发错消息。`);
-        add('eunji', working ? 3 : 1, `现在 ${now}（她：${st}）。宋恩智主动来八卦：茶水间听到的艺人传闻、约下午茶、打听她最近在忙什么。`);
+        tp = Math.random() < 0.15 ? topic('work_off', this.WORK_OFF_TOPICS) : topic('work', this.WORK_TOPICS);
+        add('work', working ? 4 : 0.5, `现在 ${now}。公司工作群里有人发消息，这次是：${tp.text}。工作群以公事为主，偶尔有一两句闲话。${NO_REPEAT}`, tp);
+        tp = topic('eunji', this.EUNJI_TOPICS);
+        add('eunji', working ? 3 : 1, `现在 ${now}（她：${st}）。宋恩智主动找她，这次聊的是：${tp.text}。${NO_REPEAT}`, tp);
       }
-      add('group', 3, `现在 ${now}。三人群里东旻先说话（转发论坛帖、吐槽允在、报告练习室发生的事），允在有空也会插一两句。`);
-      add('dongmin', 1, `现在 ${now}。东旻单独私聊她，这次聊的是：${topic(this.DONGMIN_TOPICS.concat(S.day >= 52 && Math.random() < 0.25 ? ['他追的那个女团练习生的一点小进展（和之前说的一致，还没在一起）'] : []))}。`);
-      if (h >= 18 && h < 22) add('brother', 2.5, `现在 ${now}，他刚从部队拿到手机。主动找姐姐聊：吐槽部队伙食、班长、站岗，或者跟她要东西。`);
-      if (S.amb >= 20) add('siwon', h >= 22 || h < 3 ? 2 : 0.5, `现在 ${now}。柳时元很克制地主动发一两句消息（练习结束、看到某样东西想起她）。`);
+      tp = topic('group', this.GROUP_TOPICS);
+      add('group', 3, `现在 ${now}。三人群里东旻先说话，这次是：${tp.text}。允在有空也会插一两句。${NO_REPEAT}`, tp);
+      const dm = this.DONGMIN_TOPICS.concat(S.day >= 52 && Math.random() < 0.25 ? ['他在追的女团练习生朴夏律的一点小进展（和之前说的一致，还没在一起，进展很慢）'] : []);
+      tp = topic('dongmin', dm);
+      add('dongmin', 1, `现在 ${now}。东旻单独私聊她，这次聊的是：${tp.text}。${NO_REPEAT}`, tp);
+      if (h >= 18 && h < 22) {
+        // 跟姐姐要东西：两周最多一次，而且只要小东西
+        const canAsk = day - (S.brotherAskDay || -99) >= 14 && Math.random() < 0.3;
+        tp = canAsk ? { id: 'brother', text: this.BROTHER_ASK, ask: true } : topic('brother', this.BROTHER_TOPICS);
+        add('brother', 2.5, `现在 ${now}，他刚从部队拿到手机，主动找姐姐聊，这次聊的是：${tp.text}。${canAsk ? '' : '这次不要跟姐姐要东西。'}${NO_REPEAT}`, tp);
+      }
+      if (S.amb >= 20) { tp = topic('siwon', this.SIWON_TOPICS); add('siwon', h >= 22 || h < 3 ? 2 : 0.5, `现在 ${now}。柳时元很克制地主动发一两句消息：${tp.text}。${NO_REPEAT}`, tp); }
       const pick = () => { const tot = pool.reduce((a, x) => a + x.w, 0); let r = Math.random() * tot; for (let k = 0; k < pool.length; k++) { r -= pool[k].w; if (r <= 0) return pool.splice(k, 1)[0]; } return null; };
       const n = Math.random() < 0.25 ? 2 : 1; // 一次一两个人
-      for (let k = 0; k < n && pool.length; k++) { const x = pick(); if (x && x.w > 0) { cnt[x.id] = (cnt[x.id] || 0) + 1; setTimeout(() => this.ping(x.id, x.why, day), 1500 + k * 4000); } }
+      for (let k = 0; k < n && pool.length; k++) {
+        const x = pick();
+        if (x && x.w > 0) {
+          cnt[x.id] = (cnt[x.id] || 0) + 1; said(x.tp);
+          if (x.tp && x.tp.ask) S.brotherAskDay = day;
+          setTimeout(() => this.ping(x.id, x.why, day), 1500 + k * 4000);
+        }
+      }
     },
+    AMBIENT_MAX: { friend: 2, shop: 3, work: 2, eunji: 2, group: 2, dongmin: 1, brother: 1, siwon: 1 },
     DONGMIN_TOPICS: [
       '吐槽允在今天在练习室 / 待机室干的蠢事',
-      '求她帮忙打掩护或者帮忙带个东西',
-      '炫耀济州老家寄来的橘子，问她要不要',
+      '求她帮忙打掩护，或者帮忙带个东西',
+      '济州老家的事：三个姐姐又合起来教训他、家里民宿来了奇怪的客人、橘子收成',
       '被队长俊浩骂了，来找嫂子诉苦',
       '转发论坛上一个关于允在的帖子，紧张兮兮地问要不要紧',
-      '想让她偷偷给自己多配一份加餐'
+      '打游戏连输，求嫂子安慰，或者炫耀终于上分了',
+      '在网上看到一个很好笑的视频 / 梗，非要分享',
+      '宿舍里的事：谁没洗碗、热水器又坏了、俊浩哥半夜在客厅写歌',
+      '问嫂子一个很认真的问题：怎么跟姐姐们和好、怎么给妈妈挑生日礼物',
+      '今天录综艺 / 拍物料时出的糗',
+      '突然很想吃某样东西，问嫂子哪里好吃'
     ],
-    AMBIENT_MAX: { friend: 2, shop: 3, work: 2, eunji: 2, group: 2, dongmin: 1, brother: 1, siwon: 1 },
     FRIEND_TOPICS: [
       '吐槽她自己公司的上司或同事（具体发生了什么）',
       '分享一个八卦、或者刚刷到的好笑的东西',
@@ -267,7 +300,97 @@
       '下班累死了，求安慰、求一起吃宵夜',
       '推荐一部最近在追的剧或者一家店',
       '看到论坛 / 新闻里允在的消息，来问她允在最近怎么样、你们有没有吵架',
-      '她自己的感情：暧昧对象、前任、相亲对象'
+      '她自己的感情：暧昧对象、前任、相亲对象',
+      '网购踩雷 / 买到了好东西，发来给她看',
+      '她最近在减肥 / 健身 / 学某样东西，汇报进度',
+      '想起两个人高中时候的一件事',
+      '纠结要不要跳槽、要不要搬家这种大事，问她意见',
+      '天气、季节：下雪了、好冷、想吃热乎的'
+    ],
+    GROUP_TOPICS: [
+      '转发论坛帖 / 泡泡截图来报警或者吐槽',
+      '吐槽两个人太黏，"저 여기 있어요"',
+      '练习室或待机室里刚发生的糗事',
+      '宿舍里的小事：谁偷吃了谁的零食、谁没洗碗',
+      '俊浩哥又发火了，两个人在群里偷偷吐槽',
+      '晚上组队打游戏，拉嫂子一起或者让嫂子评谁更菜',
+      '允在和东旻为一件小事吵起来，让嫂子评理',
+      '下周的行程，谁要去拍什么、谁要早起',
+      '东旻分享一个好笑的视频或者梗',
+      '一起想下次三个人去哪吃饭（只是闲聊，不一定约定）',
+      '东旻济州家里寄来了东西'
+    ],
+    SIWON_TOPICS: [
+      '练习结束，一个人留在练习室',
+      '睡不着',
+      '路过便利店看到一样东西想起她',
+      '听到一首歌，发了歌名',
+      '外面下雨 / 下雪了',
+      '很克制地问她吃了没有',
+      '今天练会了一段很难的编舞，只说了一句',
+      '在宿舍楼下看到一只猫'
+    ],
+    BROTHER_TOPICS: [
+      '吐槽今天部队伙食（具体吃了什么难吃的）',
+      '班长 / 分队长的糗事',
+      '站岗、夜里值勤：很冷、看到星星或者野猫',
+      '训练：行军、射击、体能测验的成绩，有点得意或者很丧',
+      '同宿舍战友的趣事：谁收到女朋友的信、谁偷藏零食被抓',
+      '数退伍还剩多少天，或者下次休假回家想干什么',
+      '妈妈打电话说了家里饭馆的事，转述给姐姐',
+      '问姐姐最近累不累、有没有好好吃饭，嘴上还是很贫',
+      '在部队小卖部（PX）买了什么好东西',
+      '江原道太冷了，已经下雪了',
+      '突然很想吃姐姐做的某道菜，点名要回家吃',
+      '部队里大家看的电视 / 听说的外面的事，问姐姐是不是真的'
+    ],
+    BROTHER_ASK: '跟姐姐要一样小东西（暖宝宝、一种零食、厚袜子、润唇膏之类，挑一样聊天记录里没要过的）；不要再要专辑或签名；如果聊天记录里姐姐说过已经寄了东西，先说收到了、分给了谁',
+    SHOP_TOPICS: [
+      '今天的订单：哪家要加量、哪家改了时间',
+      '备菜：哪样食材快没了、要不要临时去市场',
+      '配送：叡琳跑到哪了、路上堵、地址找不到',
+      '客人的奇怪要求（不要葱、要心形饭团……）',
+      '今天卖完了什么、剩了什么',
+      '厨房的小事故：电饭锅跳闸、打翻了酱',
+      '叡琳上课要迟到 / 请假调班',
+      'LUMIÈRE 那边的大订单（对她们来说只是大客户）'
+    ],
+    SHOP_OFF_TOPICS: [
+      '叡琳的考试 / 学校社团的事',
+      '秀珍家里的猫又闯祸了',
+      '附近新开了一家店，下班要不要去看看',
+      '天气突然变冷，提醒大家穿厚点'
+    ],
+    SHOP_AFTER_TOPICS: [
+      '提醒明天的订单和早上几点来备菜',
+      '秀珍下班路上随口说点事',
+      '叡琳发来一张下班后吃的东西 / 买的东西',
+      '有人把东西落在店里了',
+      '叡琳问下周排班能不能换'
+    ],
+    WORK_TOPICS: [
+      '明天行程变动、集合时间改了',
+      '团员饮食问题：谁偷吃夜宵被发现、谁说想吃炸鸡',
+      '会议时间通知',
+      '宣传部要她配合拍一段营养餐的物料',
+      '有人发错了消息又赶紧撤回',
+      '室长要下周的饮食计划表'
+    ],
+    WORK_OFF_TOPICS: [
+      '有人在群里请大家喝咖啡',
+      '下班前有人抱怨电梯又坏了',
+      '有人分享楼下新开的饭馆'
+    ],
+    EUNJI_TOPICS: [
+      '茶水间听到的艺人传闻',
+      '约下午茶 / 一起去楼下咖啡店',
+      '吐槽她们组的组长',
+      '她自己周末干了什么',
+      '公司食堂今天的菜很难吃',
+      '打听她最近在忙什么',
+      '发来一个购物链接问好不好看',
+      '公司新进了一批练习生，听说的事',
+      '加班到很晚，求一起点外卖'
     ],
     async ping(id, reason, day) {
       try {

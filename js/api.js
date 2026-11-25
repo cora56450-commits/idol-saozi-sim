@@ -146,6 +146,10 @@ ${extra || ''}`;
         `\n\n输出格式：\n${PROMPTS.feedFormat}\n\n${examples(PROMPTS.feedEx)}`;
       let user = stateBlock(prev ? '【前两天的内容（别重复，话题可以接着发酵）】\n' + prev : '');
       if (part === 'A') {
+        const used = [S.day - 1, S.day - 2].flatMap(d => ((S.feeds[d] || {}).instasnap || []).map(p => p.img || p._img)).filter(Boolean);
+        user += '\n\n【可用配图清单】（没有人的动态从这里挑，编号写进 img，note 照着图写；没有合适的就 img 留空）\n' +
+          (CONFIG.INSTA_PHOTOS || []).map(c => `${c.img}：${c.desc}`).join('\n') +
+          (used.length ? `\n前两天已经用过：${[...new Set(used)].join('、')}` : '');
         user += '\n\n【这次只写四个字段】bubble、instasnap、exposure_hint、alerts；forum 和 fan_group 输出空数组（下一步再写）。';
         return callJSON(sys, user, 3000);
       }

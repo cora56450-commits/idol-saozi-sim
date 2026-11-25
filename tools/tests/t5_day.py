@@ -31,7 +31,7 @@ async def main():
                 await pg.fill('.story-choices textarea','可以吃沙拉夜宵哦'); await pg.click('.story-choices .free button'); await pg.wait_for_timeout(300); continue
             if await pg.locator('#scr-desk.on').count() and not await pg.evaluate("!!Story.ev"): break
             if await pg.locator('#story-tap').count() and not await pg.locator('#phone.hidden').count(): await pg.click('#story-tap', force=True)
-            elif await pg.locator('#scr-scene.on').count(): await pg.click('#dialog', force=True)
+            elif await pg.locator("#scr-scene.on").count() and await pg.locator("#dialog:not(.hidden)").count(): await pg.click("#dialog", force=True)
             await pg.wait_for_timeout(30)
         await pg.wait_for_timeout(1500)
         await pg.screenshot(path=SH+'p_desk.png')

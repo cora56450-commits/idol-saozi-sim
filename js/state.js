@@ -166,9 +166,14 @@
       const day = (nowDay || S.day) + Math.max(0, Math.min(7, Math.round(+d.day_offset || 0)));
       if (S.dates.some(x => x.day === day && (x.who || '他') === who && !x.done)) return null; // 同一个人一天只约一次
       const x = { day, min, time: this.hhmm(min), place: d.place || (who === '他' ? '她家' : '外面'), what: d.what || '', who, done: false };
+      // 和别人的约撞了（同一天前后 3 小时内）：先不记，交给 Phone.addDateFor 让玩家二选一
+      const clash = this.dateClash(x);
+      if (clash) { x._clash = clash; return x; }
       S.dates.push(x);
       return x;
     },
+    DATE_GAP: 180, // 两个约至少隔多久才不算撞（分钟）
+    dateClash(x) { return (this.S.dates || []).find(o => !o.done && o.day === x.day && (o.who || '他') !== (x.who || '他') && Math.abs(o.min - x.min) < this.DATE_GAP) || null; },
     // 之后几天约好的（桌面卡片上提前显示）
     nextDate() { const S = this.S; return (S.dates || []).filter(x => x.day > S.day && !x.done).sort((a, b) => a.day - b.day || a.min - b.min)[0] || null; },
     pendingDate() { const S = this.S; return (S.dates || []).filter(x => x.day === S.day && !x.done).sort((a, b) => a.min - b.min)[0] || null; },

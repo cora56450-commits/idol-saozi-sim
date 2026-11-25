@@ -43,12 +43,20 @@
     if (p._img !== undefined) return p._img;
     const s = `${p.account || ''} ${p.display_name || ''}`, note = p.note || '';
     if (p.has_person === true || (p.has_person == null && PERSON_RE.test(note))) return (p._img = '');
+    const list = CONFIG.INSTA_PHOTOS || [];
+    // 1) API 生成时自己挑的图（note 就是照着这张图写的）；写了 img 但留空 = 清单里没有合适的 → 灰框
+    if (p.img !== undefined) {
+      const id = String(p.img || '').trim().replace(/\.jpg$/i, '');
+      return (p._img = list.some(c => c.img === id) ? id : '');
+    }
+    // 2) 旧存档 / 剧情里的动态：按关键词兜底。只认对得很准的（一个 3 字以上的词，或者两个词都对上），宁可灰框也不乱配
     let best = null, bestScore = 0;
-    (CONFIG.INSTA_PHOTOS || []).forEach((c, k) => {
+    list.forEach((c, k) => {
       // 对上的词越多、越长（越具体）分越高：「练习室天花板的灯」用天花板那张，不用练习室那张
       let hits = c.tags.split('|').filter(w => note.toLowerCase().includes(w.toLowerCase()));
       hits = hits.filter(w => !hits.some(o => o !== w && o.includes(w))); // 「练习」被「练习室」包含，只算一次
       if (!hits.length) return;
+      if (hits.length < 2 && !hits.some(w => w.length >= 3)) return;
       const own = c.who && new RegExp(c.who, 'i').test(s);
       const score = hits.reduce((a, w) => a + 2 + w.length, 0) + (own ? 2 : 0) + ((seed + k) % 7) / 10;
       if (score > bestScore) { best = c.img; bestScore = score; }
@@ -258,15 +266,40 @@
       const S = Game.S;
       const who = { he: '他', group: '他', friend: '郑书娟', dongmin: '东旻', siwon: '柳时元', eunji: '宋恩智', shop: '白秀珍' }[id];
       const d = who && Game.addDate(date, S.day, who);
-      if (d) {
-        const w = Game.dayWord(d.day);
-        Game.remember(`和${Game.whoName(who)}约好了：${w} ${d.time} ${d.place}（${d.what}）`);
-        S.chats[id].push({ sys: `约好了 · ${w} ${d.time} · ${d.place}`, day: S.day, t: Game.nowMin() });
-        UI.deskStats(); this.refreshChat(id);
-        // 及时弹框告诉玩家：已经记进日程
-        if (!quiet) UI.info('约好了', `${w} ${Game.dateStr(d.day).slice(5)} ${d.time}\n和${who === '他' ? '他' : Game.whoName(who)}${d.place ? ' · ' + d.place : ''}${d.what ? '\n' + d.what : ''}\n\n已经记进日程，桌面上的卡片会提醒你。`);
-      }
+      if (d && d._clash) { this.resolveClash(id, d); return true; }
+      if (d) this.dateBooked(id, d, quiet);
       return !!d;
+    },
+    dateBooked(id, d, quiet) {
+      const S = Game.S, who = d.who || '他', w = Game.dayWord(d.day);
+      Game.remember(`和${Game.whoName(who)}约好了：${w} ${d.time} ${d.place}（${d.what}）`);
+      S.chats[id].push({ sys: `约好了 · ${w} ${d.time} · ${d.place}`, day: S.day, t: Game.nowMin() });
+      UI.deskStats(); this.refreshChat(id);
+      // 及时弹框告诉玩家：已经记进日程
+      if (!quiet) UI.info('约好了', `${w} ${Game.dateStr(d.day).slice(5)} ${d.time}\n和${who === '他' ? '他' : Game.whoName(who)}${d.place ? ' · ' + d.place : ''}${d.what ? '\n' + d.what : ''}\n\n已经记进日程，桌面上的卡片会提醒你。`);
+    },
+    // 两个约撞了：让玩家二选一，推掉的那个人会回一句
+    async resolveClash(id, nd) {
+      const S = Game.S, od = nd._clash; delete nd._clash;
+      const nm = (x) => (x.who || '他') === '他' ? '他' : Game.whoName(x.who);
+      const desc = (x) => `${Game.dayWord(x.day)} ${x.time} 和${nm(x)}${x.place ? ' · ' + x.place : ''}`;
+      const keepNew = await UI.confirm('时间撞了，只能去一个', `去 ② ${nm(nd)}`, `去 ① ${nm(od)}`, `① ${desc(od)}（之前约的）\n② ${desc(nd)}（刚约的）\n\n选一个，另一个推掉。`);
+      if (Game.S !== S) return;
+      const chatOf = (x) => ({ '他': 'he', '郑书娟': 'friend', '东旻': 'dongmin', '柳时元': 'siwon', '宋恩智': 'eunji', '白秀珍': 'shop' })[x.who || '他'];
+      const lose = keepNew ? od : nd, loseId = keepNew ? chatOf(od) : id;
+      if (keepNew) { S.dates.push(nd); this.dateBooked(id, nd, true); }
+      lose.done = true; lose.cancelled = true;
+      const other = keepNew ? nd : od;
+      Game.remember(`${Game.dayWord(lose.day)} ${lose.time} 和${Game.whoName(lose.who || '他')}的约，她因为和${Game.whoName(other.who || '他')}的约撞了，推掉了`);
+      if (loseId && S.chats[loseId]) {
+        S.chats[loseId].push({ sys: `推掉了 · ${Game.dayWord(lose.day)} ${lose.time} 的约`, day: S.day, t: Game.nowMin() });
+        this.refreshChat(loseId);
+        const why = (lose.who || '他') === '他'
+          ? `她刚跟他说：${Game.dayWord(lose.day)} ${lose.time} 那个约去不了了，那个点已经和朋友约好了。他回应一下（可以失落、撒娇、嘴硬说没事，但不要吵架，不要马上再约同一个时间）。`
+          : `她刚跟你说：${Game.dayWord(lose.day)} ${lose.time}（${lose.place}）那个约去不了了，那个时间撞了别的事。你回应一下（按你的性格：可以吐槽、失落或者说没关系，可以提议改天，但不要定死新的时间）。`;
+        setTimeout(() => Main.ping(loseId, why, S.day), 1200);
+      }
+      UI.deskStats();
     },
     // 回复里出现了具体的见面安排（哪天几点）但 AI 没标约好：再问一次——定了就记进日程并弹框，只是对方提议就弹框问要不要记
     _askedDates: {},

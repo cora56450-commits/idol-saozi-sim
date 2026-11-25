@@ -127,8 +127,8 @@
         <button class="btn-small primary" data-x="yes">知道了</button></div></div>`, null, true);
       return new Promise(res => { $('[data-x=yes]').onclick = () => { this.closeModal(); res(true); }; });
     },
-    confirm(text, yes, no) {
-      this.modal(`<h2>${esc(text)}</h2><div class="form"><div class="btns">
+    confirm(text, yes, no, body) {
+      this.modal(`<h2>${esc(text)}</h2><div class="form">${body ? `<p class="info-text">${esc(body)}</p>` : ''}<div class="btns">
         <button class="btn-small" data-x="no">${esc(no || '再想想')}</button>
         <button class="btn-small primary" data-x="yes">${esc(yes || '确定')}</button></div></div>`, null, true);
       return new Promise(res => {

@@ -14,7 +14,9 @@ def reply(body):
         out = {"bubble": [{"time": "09:12", "messages": [{"type": "text", "ko": "별들아 굿모닝", "zh": "星星们早安", "note": ""}]}],
                "forum": [{"title_ko": "오늘 윤재 착장", "title_zh": "今天允在的穿搭", "hot": True, "views": 1200, "body_ko": "ㅁㅊ", "body_zh": "疯了", "comments": [{"floor": 1, "author": "무명의 판러", "ko": "ㄹㅇ", "zh": "真的"}]},
                          {"title_ko": "음방 무관중 슬프다", "title_zh": "打歌没观众好难过", "hot": False, "views": 300, "body_ko": "ㅠㅠ", "body_zh": "呜呜", "comments": []}],
-               "instasnap": [{"account": "@yunjae_lumiere", "display_name": "윤재", "note": "练习室镜子自拍", "caption_ko": "연습 끝", "caption_zh": "练习结束", "likes": 50321, "comments": [{"account": "@fan1", "ko": "잘생겼다", "zh": "好帅"}]}],
+               "instasnap": [{"account": "@yunjae_lumiere", "display_name": "윤재", "note": "练习室镜子自拍", "caption_ko": "연습 끝", "caption_zh": "练习结束", "likes": 50321, "comments": [{"account": "@fan1", "ko": "잘생겼다", "zh": "好帅"}]},
+                             {"account": "@cha.junho", "display_name": "차준호", "note": "作曲工作室的屏幕和键盘，一杯冰美式", "has_person": False, "img": "ig_07", "caption_ko": "작업", "caption_zh": "干活", "likes": 2000, "comments": []},
+                             {"account": "@dongmin_0412", "display_name": "한동민", "note": "宿舍窗外的雨", "has_person": False, "img": "", "caption_ko": "비", "caption_zh": "下雨", "likes": 3000, "comments": []}],
                "fan_group": [{"speaker": "群友 A", "ko": "다들 스밍", "zh": "大家刷流", "time": "10:00"}], "exposure_hint": 0, "alerts": []}
     elif '【为什么主动发】' in user and '郑书娟' in sys and '约这周末' in user:
         out = {"player_ko": "", "replies": [{"speaker": "郑书娟", "type": "text", "ko": "아무튼 내일 12시에 홍대역 2번 출구에서 보자", "zh": "总之明天12点弘大站2号出口见", "note": ""}], "delta": {}}
