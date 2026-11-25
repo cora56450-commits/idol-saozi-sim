@@ -215,6 +215,13 @@ ${extra || ''}`;
       return Array.isArray(j.ko) ? j.ko : [];
     },
 
+    // 照片描述（韩文）→ 中文，给聊天里的照片卡片用
+    async translateZh(list) {
+      const sys = `把下面每一句韩文翻成自然、简短的中文。这些是聊天里照片的内容描述（拍了什么），照实翻，不要加内容。只输出 JSON：{"zh":["", ...]}，顺序和数量与输入一致。`;
+      const j = await callJSON(sys, list.map((z, i) => `${i + 1}. ${z}`).join('\n'), 800);
+      return Array.isArray(j.zh) ? j.zh : [];
+    },
+
     // 第 33 天：判断玩家写的帖子
     async judgePost(title, body) {
       const sys = common() + `\n\n玩家用粉丝小号在 더쿠판 发了一篇帖子，目的是把"允在手机壳 / 西兰花贴纸 = 有女朋友"的讨论带偏。

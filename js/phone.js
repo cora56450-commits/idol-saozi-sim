@@ -64,6 +64,22 @@
     p._img = best || '';
     return p._img;
   }
+  // API 有时把说话人写成韩文名（백수진、예린……）：统一成中文名，头像和显示名都按中文名找
+  const KO_WHO = [[/백수진|수진/, '白秀珍'], [/오예린|예린/, '吴叡琳'], [/서윤재|윤재/, '徐允在'], [/한동민|동민/, '韩东旻'], [/유시원|시원/, '柳时元'],
+    [/정서연|서연/, '郑书娟'], [/송은지|은지/, '宋恩智'], [/지호/, '弟弟'], [/박\s*실장/, '朴室长']];
+  function canonWho(w) {
+    w = String(w || '').trim();
+    if (!w || !/[\uac00-\ud7a3]/.test(w)) return w;
+    const r = KO_WHO.find(([re]) => re.test(w));
+    return r ? r[1] : w;
+  }
+  // 照片卡片上显示的描述：优先用中文；AI 有时把描述写成韩文，这时用 zh，实在没有中文就先显示韩文（后台再翻）
+  const HANGUL = /[\uac00-\ud7a3]/, PH = /^\s*[\[［(（]?\s*(照片|사진|图片|相片)\s*[\]］)）]?\s*$/;
+  function photoDesc(m) {
+    const c = [m.noteZh, m.note, m.zh, m.ko].map(x => String(x || '').trim()).filter(x => x && !PH.test(x));
+    return c.find(x => !HANGUL.test(x)) || c[0] || '';
+  }
+  const triedZh = new WeakSet();
   const speakerKey = { '弟弟': 'brother', '他': 'he', '徐允在': 'he', '东旻': 'dongmin', '韩东旻': 'dongmin', '柳时元': 'siwon', '郑书娟': 'friend', '宋恩智': 'eunji',
     '白秀珍': 'sujin', '秀珍': 'sujin', '吴叡琳': 'yerin', '叡琳': 'yerin' };
   const GROUP_CHATS = ['group', 'work', 'shop'];
@@ -160,7 +176,7 @@
         const st = CONFIG.STICKERS[m.sticker];
         inner = st ? `<img class="sticker" src="${st.img}" alt="">` : `<div class="bubble">[表情]</div>`;
       } else if (m.type === 'photo') {
-        inner = `<div class="photo-card">${esc(m.note || '（照片）')}</div>`;
+        inner = `<div class="photo-card">${esc(photoDesc(m) || '（照片）')}</div>`;
       } else if (m.type === 'voice') {
         inner = voiceHTML(m);
       } else if (me) {
@@ -169,7 +185,7 @@
         inner = `<div class="bubble">${esc(m.ko)}<span class="zh">${esc(m.zh)}</span>${m.note && m.type === 'link' ? `<span class="note">${esc(m.note)}</span>` : ''}</div>`; // 普通文字消息不显示 note（AI 有时会在里面写「顺口关心」这种旁白）
       }
       if (me) return `<div class="msg me">${m.unread ? '<span class="read1">1</span>' : ''}<div class="col">${inner}</div></div>`;
-      const who = m.speaker || Game.CHATS[chatId].who;
+      const who = canonWho(m.speaker) || Game.CHATS[chatId].who;
       // 群里每个人用自己的头像；没有头像的人显示名字首字，不用群头像（不然一排全是同一个群头像）
       const key = speakerKey[who] || (GROUP_CHATS.includes(chatId) ? 'none' : chatId);
       const showName = GROUP_CHATS.includes(chatId);
@@ -177,6 +193,7 @@
     },
 
     chatView(id) {
+      setTimeout(() => this.fixPhotoZh(id), 0);
       const S = Game.S, c = Game.CHATS[id];
       let lastDay = 0, lastT = null, out = '';
       const list = S.chats[id], unread = S.unread[id] || 0, newFrom = unread ? list.length - unread : -1;
@@ -237,9 +254,9 @@
         this.refreshChat(id);
         for (const r of (j.replies || [])) {
           await sleep(700 + Math.random() * 1200);
-          const m = { day: S.day, t: Game.nowMin(), speaker: r.speaker || (id === 'he' ? '他' : Game.CHATS[id].who) };
+          const m = { day: S.day, t: Game.nowMin(), speaker: canonWho(r.speaker) || (id === 'he' ? '他' : Game.CHATS[id].who) };
           if (r.type === 'sticker') { m.type = 'sticker'; m.sticker = r.ko; }
-          else if (r.type === 'photo') { m.type = 'photo'; m.note = r.note || r.zh; }
+          else if (r.type === 'photo') { m.type = 'photo'; m.note = r.note || r.zh; m.zh = r.zh; m.ko = r.ko; }
           else if (r.type === 'voice') { m.type = 'voice'; m.ko = r.ko; m.zh = r.zh; m.note = r.note; }
           else { m.ko = r.ko; m.zh = r.zh; m.note = r.note; }
           S.chats[id].push(m);
@@ -321,6 +338,17 @@
         const ok = await UI.confirm(`${who === '他' ? '他' : Game.whoName(who)}约你${w} ${j.time}${j.place ? '，' + j.place : ''}${j.what ? '（' + j.what + '）' : ''}。记进日程吗？`, '记进日程', '先不');
         if (ok) this.addDateFor(id, j, true);
       } catch (e) { console.warn(e); }
+    },
+
+    // 照片描述只有韩文的：后台翻成中文，翻好了原地刷新
+    fixPhotoZh(id) {
+      const list = ((Game.S && Game.S.chats[id]) || []).filter(m => m.type === 'photo' && !m.noteZh && !triedZh.has(m) && HANGUL.test(photoDesc(m)));
+      if (!list.length || !API.translateZh) return;
+      list.forEach(m => triedZh.add(m));
+      API.translateZh(list.map(photoDesc)).then(zh => {
+        list.forEach((m, i) => { if (zh[i] && !HANGUL.test(zh[i])) m.noteZh = zh[i]; });
+        if (this.view === 'chat' && this.arg === id) this.refreshChat(id);
+      }).catch(() => {});
     },
 
     // 回复到了：正在看这个聊天就原地刷新（保留没发出去的草稿）；在看别的地方就只亮未读，不跳过去
@@ -409,9 +437,9 @@
     pushIncoming(id, replies, at) {
       const S = Game.S;
       for (const r of replies) {
-        const m = { day: S.day, t: at != null ? at : Game.nowMin(), speaker: r.speaker || (id === 'he' ? '他' : Game.CHATS[id].who) };
+        const m = { day: S.day, t: at != null ? at : Game.nowMin(), speaker: canonWho(r.speaker) || (id === 'he' ? '他' : Game.CHATS[id].who) };
         if (r.type === 'sticker') { m.type = 'sticker'; m.sticker = r.ko; }
-        else if (r.type === 'photo') { m.type = 'photo'; m.note = r.note || r.zh; }
+        else if (r.type === 'photo') { m.type = 'photo'; m.note = r.note || r.zh; m.zh = r.zh; m.ko = r.ko; }
         else { m.ko = r.ko; m.zh = r.zh; m.note = r.note; if (r.type === 'voice') m.type = 'voice'; }
         S.chats[id].push(m);
       }
